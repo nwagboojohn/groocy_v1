@@ -32,6 +32,11 @@ def signup_view(request):
             user.set_password(form.cleaned_data['password'])
             # 3. Save to DB
             user.save()
+
+            # --- FIX: Create the Profile object for this new user ---
+            Profile.objects.create(user=user)
+            # ---------------------------------------------------------
+
             # Send Welcome Email
             try:
                 send_groocy_email(
@@ -43,8 +48,6 @@ def signup_view(request):
             except Exception as e:
                 print(f"Email Error: {e}")
 
-            # 4. Log the user in immediately
-            # login(request, user)
             # 5. Redirect using the NAME from urls.py
             return redirect('login')
         else:
