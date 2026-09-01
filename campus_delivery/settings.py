@@ -165,6 +165,17 @@ STATICFILES_DIRS = [
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 
+# 1. Tell Django to trust your PythonAnywhere domain for secure POST requests (Login/Signup)
+CSRF_TRUSTED_ORIGINS = ['https://john62.pythonanywhere.com']
+
+# 2. Tell Django that PythonAnywhere uses a secure proxy header for HTTPS
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+# 3. Ensure session and CSRF cookies are marked as secure for HTTPS production
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = True
+
+
 # This tells WhiteNoise to aggressively compress and cache your assets
 STORAGES = {
     "default": {
