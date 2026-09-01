@@ -1,0 +1,47 @@
+{% extends 'admin/base_admin.html' %}
+{% load static %}
+{% block page_title %}Courier LeaderBoard{% endblock %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body>
+<div class="">
+    <h3>Active Couriers ({{ online_count }} online)</h3>
+</div>  
+
+<table>
+    <thead>
+        <tr>
+            <th>Username</th>
+            <th>Primary Zone</th>
+            <th>Balance</th>
+            <th>Status</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for courier in couriers %}
+        <tr>
+            <td>{{ courier.user.username }}</td>
+            <td>{{ courier.location_1 }}</td>
+            <td>₦{{ courier.balance }}</td>
+            <td>
+                {% if courier.is_available %}
+                    <span style="color: green;">● Online</span>
+                {% else %}
+                    <span style="color: gray;">● Offline</span>
+                {% endif %}
+            </td>
+        </tr>
+        {% empty %}
+        <tr>
+            <td colspan="4">No active couriers found.</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+</body>
+</html>

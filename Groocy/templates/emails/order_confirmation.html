@@ -1,0 +1,89 @@
+<div style="max-width: 600px; margin: 0 auto; font-family: sans-serif; border: 1px solid #e0e0e0; border-radius: 12px; overflow: hidden;">
+    <div style="background-color: #4CAF50; padding: 30px; text-align: center;">
+        <h1 style="color: white; margin: 0; font-size: 24px;">Order Confirmed! 🛒</h1>
+    </div>
+    
+    <div style="padding: 20px; font-size: 16px; line-height: 1.6;">
+        <p>Hi <b>{{ user.username|title }}</b>,</p>
+        <p>Your payment was successful. We’ve alerted our riders, and your campus essentials are being packed right now!</p>
+        
+        <div style="background-color: #f9f9f9; padding: 20px; border-radius: 10px; margin: 25px 0; border-left: 4px solid #4CAF50;">
+            <h4 style="margin-top: 0; color: #4CAF50; text-transform: uppercase; font-size: 13px; letter-spacing: 1px;">Delivery Details:</h4>
+            
+            <p style="margin: 8px 0;">
+                <b>📍 Delivery To:</b><br>
+                <span style="color: #555;">{{ order.address|default:"Address not specified" }}</span>
+            </p>
+            
+            <p style="margin: 8px 0;"><b>🆔 Reference:</b> <code style="background: #eee; padding: 2px 5px;">{{ order.ref }}</code></p>
+            <p style="margin: 8px 0;"><b>💳 Payment Method:</b> <span style="color: #333; font-weight: bold;">{{ order.payment_method|default:"Online" }}</span></p>
+            <p style="margin: 8px 0;"><b>📦 Status:</b> <span style="color: #4CAF50; font-weight: bold;">{{ order.status }}</span></p>
+
+            <h4 style="margin: 20px 0 10px; color: #555; font-size: 14px; text-transform: uppercase;">Your Items:</h4>
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+                <thead>
+                    <tr style="border-bottom: 2px solid #eee; text-align: left; font-size: 13px; color: #888;">
+                        <th style="padding: 10px 5px;">Item</th>
+                        <th style="padding: 10px 5px; text-align: center;">Qty</th>
+                        <th style="padding: 10px 5px; text-align: right;">Price</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in items %}
+                    <tr style="border-bottom: 1px solid #f2f2f2; font-size: 14px;">
+                        <td style="padding: 12px 5px;">
+                            <b>{{ item.product_name }}</b>
+                            <small style="color: #777;">₦{{ item.price }} each</small>
+                        </td>
+                        <td style="padding: 12px 5px; text-align: center;">x {{ item.quantity }}</td>
+                        <td style="padding: 12px 5px; text-align: right;">₦{{ item.get_total_item_price }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot>
+                    {% if amount_naira > 10500 %}
+                        <tr style="color: #777;">
+                            <td colspan="2" style="padding: 10px 5px; text-align: right; font-size: 14px;">Subtotal:</td>
+                            <td style="padding: 10px 5px; text-align: right; font-size: 14px;">₦{{ amount_naira|add:"-500"|floatformat:2 }}</td>
+                        </tr>
+                        <tr style="color: #333;">
+                            <td colspan="2" style="padding: 5px 5px; text-align: right; font-size: 14px;">Delivery Fee:</td>
+                            <td style="padding: 5px 5px; text-align: right; font-size: 14px;">₦500.00</td>
+                        </tr>
+                    {% elif amount_naira > 2800 %}
+                        <tr style="color: #777;">
+                            <td colspan="2" style="padding: 10px 5px; text-align: right; font-size: 14px;">Subtotal:</td>
+                            <td style="padding: 10px 5px; text-align: right; font-size: 14px;">₦{{ amount_naira|add:"-300"|floatformat:2 }}</td>
+                        </tr>
+                        <tr style="color: #333;">
+                            <td colspan="2" style="padding: 5px 5px; text-align: right; font-size: 14px;">Delivery Fee:</td>
+                            <td style="padding: 5px 5px; text-align: right; font-size: 14px;">₦300.00</td>
+                        </tr>
+                    {% else %}
+                        <tr style="color: #777;">
+                            <td colspan="2" style="padding: 10px 5px; text-align: right; font-size: 14px;">Subtotal:</td>
+                            <td style="padding: 10px 5px; text-align: right; font-size: 14px;">₦{{ amount_naira|add:"-200"|floatformat:2 }}</td>
+                        </tr>
+                        <tr style="color: #333;">
+                            <td colspan="2" style="padding: 5px 5px; text-align: right; font-size: 14px;">Delivery Fee:</td>
+                            <td style="padding: 5px 5px; text-align: right; font-size: 14px;">₦200.00</td>
+                        </tr>
+                    {% endif %}
+
+                    <tr style="font-weight: bold; color: #333;">
+                        <td colspan="2" style="padding: 20px 5px 10px; text-align: right; border-top: 2px solid #eee;">Total Paid:</td>
+                        <td style="padding: 20px 5px 10px; text-align: right; color: #4CAF50; font-size: 20px; border-top: 2px solid #eee;">
+                            ₦{{ amount_naira|floatformat:2 }}
+                        </td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+
+        <p style="font-size: 14px; color: #666;">If you have any questions about this order, please reply to this email.</p>
+    </div>
+    
+    <div style="background-color: #f1f1f1; padding: 15px; text-align: center; font-size: 12px; color: #888;">
+        <b>Groocy HQ</b> | Fast Delivery for Covenant University Students.
+    </div>
+</div>

@@ -1,0 +1,1086 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Groocy | Campus Essentials</title>
+    
+    <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"/>
+    <link rel="stylesheet" href="{% static 'css/groocy.css' %}">
+    <link rel="shortcut icon" href="{% static 'images/groocy-head-logo.png' %}" type="image/x-icon">
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&family=Sora:wght@400;700&display=swap" rel="stylesheet">
+    
+    <script src="https://js.paystack.co/v1/inline.js"></script>
+</head>
+
+<div id="toast" class="toast">{{ item.name }} added to bag! 🛒</div>
+
+<body>
+    <div id="freezeOverlay" class="freeze-overlay">
+        <i class="bx bx-loader-alt bx-spin" style="font-size: 3rem; color: #4CAF50;"></i>
+        <p style="margin-top: 10px; font-weight: 600;">Finalizing your order...</p>
+    </div>
+
+    <div class="app-wrapper">
+        <aside class="sidebar" id="sidebar">
+            <img class="logo" src="{% static 'images/groocy-logo.png' %}" alt="Groocy">
+            <nav>
+                <a href="{% url 'home' %}">
+                    <div class="side-nav active">
+                        <i class="bx bx-store"></i> <p>Home</p>
+                    </div>
+                </a>
+                <a href="{% url 'orders' %}">
+                    <div class="side-nav">
+                        <i class='bx bx-shopping-bag'></i> <p>My Orders</p>
+                    </div>
+                </a>
+                <a href="{% url 'profile' %}">
+                    <div class="side-nav">
+                        <i class='bx bx-user'></i> <p>Profile</p>
+                    </div>
+                </a>
+                
+                {% if user.is_staff %}
+                <a href="{% url 'admin_dashboard' %}">
+                    <div class="side-nav">
+                        <i class='bx bx-shield-quarter'></i> <p>Admin</p>
+                    </div>
+                </a>
+                {% endif %}
+
+                <div class="profile-section">
+                    {% if user.is_authenticated %}
+                        <p>Hi, <b>{{ user.username }}</b></p>
+                        <a href="{% url 'logout' %}">
+                            <div class="side-nav login-out">
+                                <i class='bx bx-log-out'></i> 
+                                <p>Logout</p>
+                            </div>
+                        </a>   
+                    {% else %}
+                        <a href="{% url 'login' %}">
+                            <div class="side-nav login-out">
+                                <i class='bx bx-log-in'></i> 
+                                <p>Login</p>
+                            </div>
+                        </a>
+                    {% endif %}
+                </div>
+            </nav>
+        </aside>
+
+        <main class="content">
+            <div class="address-container" style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin-bottom: 20px;" onclick="openAddressModal()">
+                <div style="background: #e8f5e9; color: #4CAF50; padding: 5px 8px; border-radius: 5px;">
+                    <i class='bx bx-map'></i>
+                </div>
+                <div class="address-info" style="line-height: 1.2;">
+                    <p style="font-size: 0.7rem; color: #888; margin: 0;">Deliver to:</p>
+                    <p id="displayAddress" style="font-size: 0.85rem; font-weight: 600; margin: 0;">
+                        {{ user.profile.address|default:"Set Address" }}
+                    </p>
+                </div>
+            </div>
+
+            <div id="addressModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:2200; align-items:center; justify-content:center;">
+                <div style="background:white; padding:25px; border-radius:10px; width:90%; max-width:400px; position:relative;">
+                    <h3 style="margin-top:0;">Delivery Address</h3>
+                    <p style="font-size: 0.8rem; color: #666;">Enter your Hostel/Hall and Room Number</p>
+                    
+                    <form method="POST" action="{% url 'update_address' %}" onsubmit="combineAddress()">
+                        {% csrf_token %}
+                        
+                        <select id="hallSelect" style="width:100%; padding:12px; border:1px solid #ddd; border-radius:10px; margin-top:15px; outline: none; background: #fff;" required>
+                            <option value="" disabled selected>Select your Hall...</option>
+                            <option value="John Hall">John Hall</option>
+                            <option value="Paul Hall">Paul Hall</option>
+                            <option value="Lydia Hall">Lydia Hall</option>
+                            <option value="Mary Hall">Mary Hall</option>
+                        </select>
+
+                        <input type="text" id="roomInput" placeholder="Room Number (e.g. B204)" style="width:100%; padding:12px; border:1px solid #ddd; border-radius:10px; margin:15px 0; outline: none;" required>
+                        
+                        <input type="hidden" name="address" id="finalAddressInput">
+                        
+                        <button type="submit" style="width:100%; padding:12px; background:#111; color:white; border:none; border-radius:10px; font-weight:600; cursor: pointer;">
+                            Save Address
+                        </button>
+                    </form>
+                    
+                    <i class='bx bx-x' onclick="closeAddressModal()" style="position:absolute; top:15px; right:15px; font-size:1.5rem; cursor:pointer;"></i>
+                </div>
+            </div>
+
+            <header class="header-box" style="display: flex; align-items: center; justify-content: space-between; gap: 15px;">
+                <!-- Input search -->
+                <input type="text" id="searchInput" placeholder="Search Groocy..." onkeyup="liveSearch()" style="flex: 1;">
+                
+                <div class="cart-trigger" onclick="toggleCartDrawer()" style="position: relative; cursor: pointer;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="25" height="25" fill="#222222" viewBox="0 0 24 24">
+                        <path d="M2.21 9.39c-.19.25-.25.57-.17.87l2.8 10.26c.24.87 1.03 1.47 1.93 1.47h10.47c.9 0 1.69-.61 1.93-1.47l2.8-10.26c.08-.3.02-.62-.17-.87a.99.99 0 0 0-.79-.39h-1.42l-3.71-6.5-1.74.99 3.15 5.5H6.72l3.15-5.5-1.74-.99L4.42 9H3a1 1 0 0 0-.79.39M17.24 20H6.76l-2.45-9h15.38z"></path>
+                        <path d="M9 13h2v5H9zm4 0h2v5h-2z"></path>
+                    </svg> 
+                    <span id="cartCountBadge" style="position: absolute; top: -5px; right: -5px; background: #ff4d4d; color: white; font-size: 0.65rem; padding: 2px 6px; border-radius: 50%; font-weight: bold; display: none;">0</span>
+                </div>
+            </header>
+
+            <section class="category-section">
+                <h3>Select Category</h3>
+                <div class="category">
+                    <button class="category-option active" onclick="filterCategory('all', this)">All</button>
+                    {% for cat in categories %}
+                        <button class="category-option" onclick="filterCategory('{{ cat.slug }}', this)">
+                            {{ cat.name }}
+                        </button>
+                    {% endfor %}
+                </div>
+            </section>
+
+            {% if out_of_stock_count > 0 %}
+            <div style="width: fit-content; background: #fff2f2; color: #d32f2f; padding:15px; border: 1px solid #ffdede; border-radius:12px; margin-bottom:10px; border-left: 5px solid #d32f2f;">
+                <i class='bx bxs-x-circle' style="vertical-align: middle;"></i> 
+                <b>Attention:</b> 
+                <span>({% for item in out_of_stock_items %}{{ item.name }}{% if not forloop.last %}, {% endif %}{% endfor %})</span>
+                {% if out_of_stock_count == 1 %} is {% else %} are {% endif %} completely out of stock! 
+            </div>
+            {% endif %}
+
+            {% if low_stock_count > 0 %}
+            <div style="width: fit-content; background:#fff7ea; color:#e18a08; padding:15px; border-radius:12px; margin-bottom:20px; border: 1px solid #ffe4bc; border-left: 5px solid #e18a08;">
+                <i class='bx bxs-error-circle' style="vertical-align: middle;"></i> <b>Attention:</b> {{ low_stock_count }} {% if low_stock_count == 1 %} item is {% else %} items are {% endif %} low on stock! 
+                ({% for item in low_stock_items %}{{ item.name }}{% if not forloop.last %}, {% endif %}{% endfor %})
+            </div>
+            {% endif %}
+
+            <div id="productGrid" class="grid">
+                {% for item in products %}
+                <div class="card" data-name="{{ item.name|lower }}" data-category="{{ item.category|lower }}">
+                    <div class="image-container" style="position: relative;">
+                        {% if item.image %}
+                            <img src="{{ item.image.url }}" alt="{{ item.name }}" id="prod-img-{{item.id}}">
+                        {% else %}
+                            <img src="{% static 'images/placeholder.png' %}" alt="No image" id="prod-img-{{item.id}}">
+                        {% endif %}
+
+                        <!-- NEW: Packaging Unit Badge (Only shows if it's a Pack or Carton) -->
+                        {% if item.unit_type and item.unit_type != 'Piece' %}
+                            <span style="position: absolute; top: 100px; right: 10px; background: #673ab7; color: white; padding: 4px 8px; border-radius: 6px; font-size: 0.7rem; font-weight: 700; box-shadow: 0 2px 5px rgba(0,0,0,0.15);">
+                                <i class='bx bx-package'></i> {{ item.unit_type|upper }}
+                            </span>
+                        {% endif %}
+
+                        <!-- Existing Stock Badges -->
+                        {% if not item.is_in_stock %}
+                            <span style="position: absolute; top: 10px; right: 10px; background: #ff4d4d; color: white; padding: 4px 8px; border-radius: 6px; font-size: 0.7rem; font-weight: 700;">SOLD OUT</span>
+                        {% elif item.instock < 10 %}
+                            <span style="position: absolute; top: 10px; right: 10px; background: #ff9800; color: white; padding: 4px 8px; border-radius: 6px; font-size: 0.7rem; font-weight: 700; animation: pulse 1.5s infinite;">LOW STOCK</span>
+                        {% endif %}
+                    </div>
+
+                    <h3 class="product-name">{{ item.name }}</h3>
+                    
+                    <!-- 1. The user selects the unit -->
+                    <!-- <select id="unitSelect_{{ product.id }}">
+                        <option value="Piece">Piece (₦200)</option>
+                        <option value="Pack">Pack (₦2,400)</option>
+                        <option value="Carton">Carton (₦4,800)</option>
+                    </select> -->
+
+                    <!-- NEW: Appended the unit type to the price -->
+                    <p class="product-price">
+                        ₦{{ item.price }} 
+                        <span style="font-size: 0.75rem; color: #888; font-weight: normal;">/ {{ item.unit_type|default:"piece"|lower }}</span>
+                    </p>
+
+                    <div class="stock-info" style="margin-bottom: 12px;">
+                        {% if item.is_in_stock %}
+                            <p style="font-size: 0.8rem; text-align: center; color: #666; background: #e9e9e9; margin: 0; padding: 5px 8px; border-radius: 5px;">
+                                Available: <span class="quantity" style="font-weight: 600; color: #333;">{{ item.instock }}</span>
+                            </p>
+                        {% else %}
+                            <p style="font-size: 0.8rem; color: #ff4d4d; background: #ffeded; text-align: center; padding: 5px 8px; border-radius: 5px; font-weight: 600; margin: 0;">Restocking soon
+                                <span class="quantity" style="display:none;">0</span>
+                            </p>
+                        {% endif %}
+                    </div>
+                    
+                    {% if item.is_in_stock %}
+                        <button onclick="addToCart('{{item.id}}', '{{item.name}}', '{{item.price}}', '{% if item.image %}{{ item.image.url }}{% else %}{% static 'images/placeholder.png' %}{% endif %}', '{{ item.unit_type }}')">
+                            Add to cart
+                        </button>
+                    {% else %}
+                        <button class="disabled-btn" style="background-color: #eee; color: #747474; cursor: not-allowed; border: 1px solid #ddd;" disabled>
+                            Out of Stock
+                        </button>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+
+            <div id="noResult" style="display:none; text-align:center; padding:50px;">
+                <h3>Oops! Search not found.</h3>
+            </div>
+        </main>
+
+        <aside class="cart-drawer" id="cartDrawer">
+            <div class="close-cart" onclick="toggleCartDrawer()">
+                <i class="bx bx-x"></i>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h3 style="margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="#4CAF50" viewBox="0 0 24 24">
+                        <path d="M2.21 9.39c-.19.25-.25.57-.17.87l2.8 10.26c.24.87 1.03 1.47 1.93 1.47h10.47c.9 0 1.69-.61 1.93-1.47l2.8-10.26c.08-.3.02-.62-.17-.87a.99.99 0 0 0-.79-.39h-1.42l-3.71-6.5-1.74.99 3.15 5.5H6.72l3.15-5.5-1.74-.99L4.42 9H3a1 1 0 0 0-.79.39M17.24 20H6.76l-2.45-9h15.38z"></path>
+                        <path d="M9 13h2v5H9zm4 0h2v5h-2z"></path>
+                    </svg> 
+                    Your Bag
+                </h3>
+                <i class='bx bx-x' onclick="toggleCartDrawer()" style="font-size: 2rem; cursor: pointer; color: #666;"></i>
+            </div>
+
+            <!-- Container that holds added items OR empty state graphic -->
+            <div id="cartItems"></div>
+
+            <!-- Divider & Summary Sections (Targeted by JS) -->
+            <hr id="cartDivider" style="margin-top: 15px;">
+
+            <div class="cart-summary" id="cartSummarySection">
+                <div class="total-summary" style="color: #222222; font-size: 0.87rem; display: flex; align-items: center; justify-content: space-between; margin: 10px 0;">
+                    <p>Sub-total</p>
+                    <p style="font-weight: 600;">₦<span id="subtotalPrice">0.00</span></p>
+                </div>
+                <div class="total-summary" style="color: #222222; font-size: 0.87rem; display: flex; align-items: center; justify-content: space-between; margin: 10px 0;">
+                    <p>Shipping Fee</p>
+                    <p style="font-weight: 600;">₦<span id="shippingFee">0.00</span></p>
+                </div>
+                <div class="total-summary" style="color: #000; font-size: 1rem; font-weight: 600; display: flex; align-items: center; justify-content: space-between; margin: 10px 0;">
+                    <p>Total:</p>
+                    <p style="font-weight: 600;">₦<span id="totalPrice">0.00</span></p>
+                </div>
+            </div>
+
+            <div id="minOrderWarning" style="display: none; background-color: #fff9db; color: #856404; padding: 10px; border-radius: 8px; font-size: 0.8rem; margin: 10px 0; border: 1px solid #ffeeba; text-align: center;">
+                <i class='bx bx-info-circle'></i> <span id="minOrderText"></span>
+            </div>
+
+            <div id="clear-cart-container" style="display: none;"></div>
+
+            <div class="payment-options" id="cartPaymentSection" style="margin-top: 15px;">
+                <p style="font-size: 0.8rem; color: #666; margin-bottom: 8px;">Select Payment Method:</p>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
+                    <!-- Online Option -->
+                    <div class="pay-opt active" id="opt-online" onclick="selectPayment('Online')" 
+                        style="display: flex; flex-direction: column; gap: 7px; justify-content: space-between; border: 2px solid #4CAF50; padding: 12px; border-radius: 12px; text-align: center; cursor: pointer; transition: all 0.3s ease; background: #f0fdf4;">
+                        <i class='bx bx-credit-card' id="icon-online" style="font-size: 1.5rem; color: #4CAF50;"></i>
+                        <p style="font-size: 0.75rem; font-weight: 600;">Online</p>
+                    </div>
+
+                    <!-- POD Option -->
+                    <div class="pay-opt" id="opt-pod" onclick="selectPayment('POD')" 
+                        style="display: flex; flex-direction: column; gap: 7px; justify-content: space-between; border: 2px solid #eee; padding: 12px; border-radius: 12px; text-align: center; cursor: pointer; transition: all 0.3s ease; background: #fff;">
+                        <i class='fa-solid fa-hand-holding-hand' id="icon-pod" style="font-size: 1.2rem; color: #666;"></i>
+                        <p style="font-size: 0.75rem; font-weight: 600;">Pay on Delivery</p>
+                    </div>
+                </div>
+
+                <button class="btn" id="payButton" onclick="handleCheckout()" style="width: 100%; transition: background 0.3s ease;">
+                    <span id="btnText">Pay Online</span>
+                    <span id="btnSpinner" style="display: none;"><i class="bx bx-loader-alt bx-spin"></i></span>
+                </button>
+            </div>
+        </aside>
+    </div>
+
+    <script>
+        // --- 1. Cart Management ---
+        let cart = JSON.parse(localStorage.getItem('groocyCart')) || [];
+        
+        // calls toast notification when user adds item to cart
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            toast.innerText = message;
+            toast.classList.add('show');
+
+            // Hide it after 2 seconds
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 2000);
+        }
+
+        // Added 'image' parameter
+        function addToCart(id, name, price, image, unit_type = 'Piece') {
+            // 1. Find the specific card and stock element
+            const card = document.querySelector(`.card[data-name="${name.toLowerCase()}"]`);
+            const stockElement = card ? card.querySelector('.quantity') : null;
+
+            // Validation: If the UI element is missing, we can't check stock safely
+            if (!stockElement) {
+                console.error("Could not find stock element for", name);
+                return;
+            }
+
+            // 2. Parse current available stock
+            const availableStock = parseInt(stockElement.innerText);
+
+            // 3. Find if the item is already in the cart
+            const existingItem = cart.find(item => item.id === id && item.unit_type === unit_type);
+            const currentQtyInCart = existingItem ? existingItem.quantity : 0;
+
+            // 4. Stock Validation
+            if (availableStock <= 0) {
+                alert(`Sorry, ${name} is currently out of stock!`);
+                return;
+            }
+
+            if (currentQtyInCart >= availableStock) {
+                alert(`Sorry, we only have ${availableStock} units of ${name} left!`);
+                return;
+            }
+
+            // 5. Add or Increment (Logic is perfect here)
+            if (existingItem) {
+                existingItem.quantity += 1; 
+            } else {
+                // Ensure price is a number; remove any commas or currency symbols if they exist
+                const cleanPrice = typeof price === 'string' ? parseFloat(price.replace(/[^0-9.]/g, '')) : price;
+                cart.push({ id, name, price: cleanPrice, image, quantity: 1, unit_type });
+            }
+
+            // 6. Save and Sync
+            localStorage.setItem('groocyCart', JSON.stringify(cart));
+            updateCartUI();
+            showToast(`${name} added to bag! 🛒`);
+        }
+
+        async function syncCartToSession() {
+            try {
+                await fetch('/sync-cart/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCookie('csrftoken'), 
+                    },
+                    body: JSON.stringify({ cart: cart })
+                });
+            } catch (error) {
+                console.error("Cart sync failed:", error);
+            }
+        }
+
+        // Helper to get CSRF token from cookies
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+
+        // Function to clear cart
+        let isConfirmingClear = false;
+
+        function updateCartUI() {
+            const container = document.getElementById('cartItems');
+            const subtotalSpan = document.getElementById('subtotalPrice');
+            const shippingSpan = document.getElementById('shippingFee');
+            const totalSpan = document.getElementById('totalPrice');
+            const checkoutBtn = document.getElementById('payButton');
+            const minOrderMsg = document.getElementById('minOrderWarning');
+            const minOrderText = document.getElementById('minOrderText');
+            const clearBtnContainer = document.getElementById('clear-cart-container');
+            const headerBadge = document.getElementById('cartCountBadge');
+            const mobileBadge = document.getElementById('mobileCartBadge');
+
+            // Section toggles
+            const cartDivider = document.getElementById('cartDivider');
+            const cartSummarySection = document.getElementById('cartSummarySection');
+            const cartPaymentSection = document.getElementById('cartPaymentSection');
+
+            // 1. EMPTY CART STATE
+            if (!cart || cart.length === 0) {
+                // Render Empty State Graphic + Text
+                container.innerHTML = `
+                    <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 50px 20px; text-align: center;">
+                        <div style="width: 110px; height: 110px; display: flex; align-items: center; justify-content: center; margin-bottom: 16px;">
+                            <img class="logo" src="{% static 'images/cart_bag.png' %}" alt="Groocy">
+                        </div>
+                        <h4 style="margin: 0; font-size: 1.1rem; color: #1f2937; font-weight: 600;">Bag is empty</h4>
+                        <p style="margin: 6px 0 0 0; font-size: 0.82rem; color: #6b7280; max-width: 200px;">Looks like you haven't added anything to your bag yet.</p>
+                    </div>
+                `;
+
+                // Hide cart drawer summary and payment options
+                if (cartDivider) cartDivider.style.display = "none";
+                if (cartSummarySection) cartSummarySection.style.display = "none";
+                if (cartPaymentSection) cartPaymentSection.style.display = "none";
+
+                // Reset & hide supplementary controls
+                if (subtotalSpan) subtotalSpan.innerText = "0.00";
+                if (shippingSpan) shippingSpan.innerText = "0.00";
+                if (totalSpan) totalSpan.innerText = "0.00";
+                if (headerBadge) headerBadge.style.display = "none";
+                if (mobileBadge) mobileBadge.style.display = "none";
+                if (minOrderMsg) minOrderMsg.style.display = "none";
+                
+                if (clearBtnContainer) {
+                    clearBtnContainer.style.display = 'none';
+                    clearBtnContainer.innerHTML = '';
+                }
+                return;
+            }
+
+            // 2. ACTIVE CART STATE (Items Present)
+            if (cartDivider) cartDivider.style.display = "block";
+            if (cartSummarySection) cartSummarySection.style.display = "block";
+            if (cartPaymentSection) cartPaymentSection.style.display = "block";
+
+            // Subtotal Calculation & Minimum Order Check
+            let subtotal = cart.reduce((sum, item) => sum + parseFloat(item.price * item.quantity), 0);
+
+            if (subtotal > 0 && subtotal < 1000) {
+                let remaining = 1000 - subtotal;
+                minOrderText.innerText = `Add ₦${remaining.toLocaleString()} more to checkout`;
+                minOrderMsg.style.display = "block";
+                checkoutBtn.style.opacity = "0.5";
+                checkoutBtn.style.cursor = "not-allowed";
+                checkoutBtn.disabled = true;
+            } else {
+                minOrderMsg.style.display = "none";
+                checkoutBtn.style.opacity = "1";
+                checkoutBtn.style.cursor = "pointer";
+                checkoutBtn.disabled = false;
+            }
+
+            // Dynamic Shipping Fee
+            let shippingFee = 0;
+            if (subtotal > 10000) {
+                shippingFee = 500;
+            } else if (subtotal > 2500) {
+                shippingFee = 300;
+            } else {
+                shippingFee = 200;
+            }
+
+            let total = subtotal + shippingFee;
+
+            // Render Cart Items
+            container.innerHTML = cart.map((item, index) => {
+                const isBulk = item.unit_type === 'Pack' || item.unit_type === 'Carton';
+                const badgeBg = isBulk ? '#7c3aed' : '#e5e7eb';
+                const badgeColor = isBulk ? '#ffffff' : '#4b5563';
+
+                return `
+                    <div class="cart-item" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px;">
+                        <img src="${item.image}" class="cart-img" style="width: 50px; height: 50px; border-radius: 8px; object-fit: cover;">
+                        <div class="cart-item-info" style="flex: 1; margin-left: 10px;">
+                            <p style="margin: 0; font-weight: 600; font-size: 0.9rem;">${item.name}</p>
+                            <div style="display: flex; align-items: center; gap: 6px; margin-top: 4px;">
+                                <span style="background: ${badgeBg}; color: ${badgeColor}; font-size: 0.65rem; font-weight: 600; padding: 2px 6px; border-radius: 4px; text-transform: uppercase;">
+                                    ${item.unit_type}
+                                </span>
+                                <span style="font-size: 0.8rem; color: #666;">₦${item.price.toLocaleString()} x ${item.quantity}</span>
+                            </div>
+                        </div>
+                        <div class="qty-controls" style="display: flex; align-items: center; gap: 8px;">
+                            <button onclick="changeQty(${index}, -1)" style="border:none; background:#eee; border-radius:4px; width:24px; height: 24px; cursor: pointer; display: flex; align-items: center; justify-content: center;">-</button>
+                            <span style="font-size: 0.85rem; font-weight: 500;">${item.quantity}</span>
+                            <button onclick="changeQty(${index}, 1)" style="border:none; background:#eee; border-radius:4px; width:24px; height: 24px; cursor: pointer; display: flex; align-items: center; justify-content: center;">+</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            // Update Badges
+            const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
+            if (headerBadge) {
+                headerBadge.innerText = totalItems;
+                headerBadge.style.display = "block";
+            }
+            if (mobileBadge) {
+                mobileBadge.innerText = totalItems;
+                mobileBadge.style.display = "block";
+            }
+
+            // Clear Cart Button & Confirmation UI
+            if (clearBtnContainer) {
+                clearBtnContainer.style.display = 'block';
+
+                if (isConfirmingClear) {
+                    clearBtnContainer.innerHTML = `
+                        <div style="display: flex; flex-direction: column; gap: 12px; align-items: center; justify-content: space-between; background-color: #fff1f2; border: 1px dashed #fca5a5; padding: 10px 12px; border-radius: 8px; margin-top: 15px;">
+                            <span style="font-size: 0.8rem; color: #e11d48; font-weight: 600;">Empty entire bag?</span>
+                            <div style="display: flex; gap: 8px;">
+                                <button onclick="cancelClearCart()" style="background-color: #ffffff; color: #4b5563; border: 1px solid #d1d5db; padding: 6px 12px; border-radius: 6px; font-size: 0.75rem; font-weight: 600; cursor: pointer;">Cancel</button>
+                                <button onclick="executeClearCart()" style="background-color: #e11d48; color: #ffffff; border: none; padding: 6px 12px; border-radius: 6px; font-size: 0.75rem; font-weight: 600; cursor: pointer;">Yes, Clear</button>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    clearBtnContainer.innerHTML = `
+                        <button onclick="requestClearCart()" style="display: flex; align-items: center; justify-content: center; width: 100%; gap: 6px; background-color: #fef2f2; color: #ef4444; border: 1px dashed #fca5a5; padding: 8px; border-radius: 8px; font-size: 0.8rem; font-weight: 600; cursor: pointer; margin-top: 15px;">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="3 6 5 6 21 6"></polyline>
+                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                            </svg>
+                            Clear Bag
+                        </button>
+                    `;
+                }
+            }
+
+            // Update Totals
+            subtotalSpan.innerText = subtotal.toLocaleString(undefined, {minimumFractionDigits: 2});
+            shippingSpan.innerText = shippingFee.toLocaleString(undefined, {minimumFractionDigits: 2});
+            totalSpan.innerText = total.toLocaleString(undefined, {minimumFractionDigits: 2});
+        }
+
+        // --- GLOBALLY SCOPED HELPER FUNCTIONS --- //
+
+        function requestClearCart() {
+            isConfirmingClear = true;
+            updateCartUI();
+        }
+
+        function cancelClearCart() {
+            isConfirmingClear = false;
+            updateCartUI();
+        }
+
+        function executeClearCart() {
+            cart = [];
+
+            // FIXED: Use setItem instead of removeItem to force save an empty array
+            localStorage.setItem('groocyCart', JSON.stringify([]));
+
+            isConfirmingClear = false;
+            updateCartUI();
+            
+            // Call the updated toast function using your existing HTML element
+            showToast("Cart successfully deleted! 🗑️");
+        }
+
+        // --- UPDATED TOAST FUNCTION --- //
+
+        function showToast(message) {
+            // 1. Target your existing HTML container instead of creating a new one
+            const toast = document.getElementById('toast');
+            if (!toast) return;
+
+            // 2. Update the text
+            toast.textContent = message;
+            
+            // 3. Apply styles to animate it in (This ensures it works without you needing to write extra CSS)
+            toast.style.cssText = `
+                position: fixed;
+                top: 10px; 
+                left: 50%;
+                transform: translateX(-50%) translateY(20px);
+                background-color: #1f2937;
+                color: #ffffff;
+                padding: 12px 24px;
+                border-radius: 8px;
+                font-size: 0.875rem;
+                font-weight: 500;
+                box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+                z-index: 9999;
+                opacity: 0;
+                visibility: hidden;
+                transition: opacity 0.3s ease, transform 0.3s ease;
+                white-space: nowrap;
+            `;
+            
+            // Trigger reflow so the browser registers the starting position
+            void toast.offsetWidth;
+
+            // 4. Animate In
+            toast.style.visibility = 'visible';
+            toast.style.opacity = '1';
+            toast.style.transform = 'translateX(-50%) translateY(0)';
+
+            // 5. Animate Out after 3 seconds
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateX(-50%) translateY(20px)';
+                
+                // Hide completely after fade out finishes
+                setTimeout(() => {
+                    toast.style.visibility = 'hidden';
+                }, 300);
+            }, 3000);
+        }
+
+        // added an "Out of Stock" label to products when their instock hits zero '0'
+        function checkStockLevels() {
+            const cards = document.querySelectorAll('.card');
+            cards.forEach(card => {
+                const qtySpan = card.querySelector('.quantity');
+                const btn = card.querySelector('button');
+                const stock = parseInt(qtySpan.innerText);
+
+                if (stock <= 0) {
+                    btn.innerText = "Out of Stock";
+                    btn.classList.add('out-of-stock-btn');
+                    btn.onclick = null; // Remove the click function
+                    qtySpan.classList.add('out-of-stock-label');
+                }
+            });
+        }
+
+        // New helper function to handle + and - in cart
+        function changeQty(index, delta) {
+            const item = cart[index];
+            
+            // Find the product card in the DOM to get current stock
+            const card = document.querySelector(`.card[data-name="${item.name.toLowerCase()}"]`);
+            const stockElement = card ? card.querySelector('.quantity') : null;
+            
+            if (delta > 0 && stockElement) {
+                const availableStock = parseInt(stockElement.innerText);
+                if (item.quantity >= availableStock) {
+                    alert(`Sorry, only ${availableStock} units of ${item.name} available.`);
+                    return; // Stop the increment
+                }
+            }
+
+            item.quantity += delta;
+            
+            if (item.quantity <= 0) {
+                cart.splice(index, 1); // Remove product if quantity hits 0
+            }
+            
+            localStorage.setItem('groocyCart', JSON.stringify(cart));
+            updateCartUI();
+        }
+
+        function removeFromCart(index) {
+            cart.splice(index, 1);
+            localStorage.setItem('groocyCart', JSON.stringify(cart));
+            updateCartUI();
+        }
+
+        // // Toggle Sidebar (Mobile)
+        // function toggleSidebar() {
+        //     const sidebar = document.getElementById('sidebar');
+        //     const overlay = document.getElementById('drawerOverlay'); // Re-using your overlay
+
+        //     sidebar.classList.toggle('active');
+        //     overlay.classList.toggle('active');
+
+        //     // Manage scroll
+        //     document.body.style.overflow = sidebar.classList.contains('active') ? 'hidden' : 'auto';
+        // }
+
+        // --- Drawer Toggle Helper ---
+        function toggleCartDrawer() {
+            const drawer = document.getElementById('cartDrawer');
+            const overlay = document.getElementById('drawerOverlay');
+
+            // Toggle the 'active' class on both
+            drawer.classList.toggle('active');
+            overlay.classList.toggle('active');
+
+            // Prevent scrolling on the main page when cart is open
+            if (drawer.classList.contains('active')) {
+                document.body.style.overflow = 'hidden';
+            } else {
+                document.body.style.overflow = 'auto';
+            }
+        }
+
+        // make sure the drawerOverlay click function handles whatever is open
+        // function closeEverything() {
+        //     document.getElementById('sidebar').classList.remove('active');
+        //     document.getElementById('cartDrawer').classList.remove('active');
+        //     document.getElementById('drawerOverlay').classList.remove('active');
+        //     document.body.style.overflow = 'auto';
+        // }
+        
+
+        // --- 2. Search Logic ---
+        function liveSearch() {
+            let input = document.getElementById('searchInput').value.toLowerCase();
+            let cards = document.querySelectorAll('.card');
+            let visibleCount = 0;
+
+            cards.forEach(card => {
+                if (card.getAttribute('data-name').includes(input)) {
+                    card.style.display = "block";
+                    visibleCount++;
+                } else {
+                    card.style.display = "none";
+                }
+            });
+
+            document.getElementById('productGrid').style.display = visibleCount ? "grid" : "none";
+            document.getElementById('noResult').style.display = visibleCount ? "none" : "block";
+        }
+
+        // --- 3. Address Function
+        function openAddressModal() {
+            document.getElementById('addressModal').style.display = 'flex';
+        }
+
+        function closeAddressModal() {
+            document.getElementById('addressModal').style.display = 'none';
+        }
+
+
+        // --- 4. Filter Category ---
+        function filterCategory(category, button) {
+            let cards = document.querySelectorAll('.card');
+            let productGrid = document.getElementById('productGrid');
+            let noResult = document.getElementById('noResult');
+            let visibleCount = 0;
+
+            // 1. Update UI: Remove 'active' class from all buttons and add to the clicked one
+            document.querySelectorAll('.category-option').forEach(btn => btn.classList.remove('active'));
+            button.classList.add('active');
+
+            // 2. Filter Logic
+            cards.forEach(card => {
+                let productCat = card.getAttribute('data-category');
+                
+                if (category === 'all' || productCat === category) {
+                    card.style.display = "block";
+                    visibleCount++;
+                } else {
+                    card.style.display = "none";
+                }
+            });
+
+            // 3. Handle Empty State
+            if (visibleCount === 0) {
+                productGrid.style.display = "none";
+                noResult.style.display = "block";
+            } else {
+                productGrid.style.display = "grid";
+                noResult.style.display = "none";
+            }
+        }
+
+        let selectedMethod = 'Online'; // Default
+
+        function selectPayment(method) {
+            selectedMethod = method;
+            
+            // Elements
+            const optOnline = document.getElementById('opt-online');
+            const optPod = document.getElementById('opt-pod');
+            const iconOnline = document.getElementById('icon-online');
+            const iconPod = document.getElementById('icon-pod');
+            const payBtn = document.getElementById('payButton');
+            const btnText = document.getElementById('btnText');
+
+            if (method === 'Online') {
+                // Apply Online Active Styles
+                optOnline.style.borderColor = "#4CAF50";
+                optOnline.style.backgroundColor = "#f0fdf4"; 
+                iconOnline.style.color = "#4CAF50";
+                
+                // Reset POD Styles
+                optPod.style.borderColor = "#eee";
+                optPod.style.backgroundColor = "#fff";
+                iconPod.style.color = "#666";
+
+                // Update Button - Keep it Brand Green!
+                btnText.innerText = "Pay Online";
+                payBtn.style.backgroundColor = "#4CAF50"; 
+                payBtn.style.color = "#fff";
+            } else {
+                // Apply POD Active Styles
+                optPod.style.borderColor = "#4CAF50";
+                optPod.style.backgroundColor = "#f0fdf4";
+                iconPod.style.color = "#4CAF50";
+                
+                // Reset Online Styles
+                optOnline.style.borderColor = "#eee";
+                optOnline.style.backgroundColor = "#fff";
+                iconOnline.style.color = "#666";
+
+                // Update Button - Keep it Brand Green!
+                btnText.innerText = "Confirm POD Order";
+                payBtn.style.backgroundColor = "#4CAF50"; 
+                payBtn.style.color = "#fff";
+            }
+        }
+
+        async function handleCheckout() {
+            if (selectedMethod === 'Online') {
+                payWithPaystack();
+            } else {
+                processPODOrder();
+            }
+        }
+
+        async function processPODOrder() {
+            // 1. Validation (Reuse your existing address and min-order checks here)
+            // ... (Add your validation logic)
+            
+            if(!confirm("Confirm your Pay on Delivery order?")) return;
+
+            try {
+                await syncCartToSession();
+                const response = await fetch('/create-pod-order/', {
+                    method: 'POST',
+                    headers: { 'X-CSRFToken': getCookie('csrftoken'), 'Content-Type': 'application/json' }
+                });
+                const data = await response.json();
+                if (data.success) {
+                    localStorage.removeItem('groocyCart');
+                    window.location.href = "/payment-success/?ref=" + data.ref;
+                }
+            } catch (err) { alert("Checkout failed. Please try again."); }
+        }
+
+        
+        // --- 5. Paystack Integration ---
+        async function payWithPaystack() {
+            // 1. Check if Address is set in the database (passed via Django context)
+            const userAddress = "{{ user.profile.address }}";
+
+            if (!userAddress || userAddress === "None" || userAddress === "") {
+                alert("📍 Please set your delivery address before checking out!");
+                openAddressModal(); // Force the modal open
+                return;
+            }
+
+            const btnText = document.getElementById('btnText');
+            const btnSpinner = document.getElementById('btnSpinner');
+            const payBtn = document.getElementById('payButton');
+            const freezeOverlay = document.getElementById('freezeOverlay');
+
+            // 2. Calculate subtotal once using parseFloat
+            let subtotal = cart.reduce((sum, item) => sum + parseFloat(item.price * item.quantity), 0);
+            const MIN_ORDER_AMOUNT = 1000; // Set your limit here
+
+            // 3. Check if the subtotal meets the minimum requirement
+            if (subtotal < MIN_ORDER_AMOUNT) {
+                // We use a friendly alert, or you could show a red error message on the page
+                alert(`🛒 Your cart total is ₦${subtotal.toLocaleString()}. Please you can't purchase items less than ₦${MIN_ORDER_AMOUNT}.`);
+                return;
+            }
+
+            // 4. Single check for empty cart
+            if (subtotal <= 0){
+                return alert("Your cart is empty, Please add item to cart!")
+            }
+
+            // 5. Dynamic Shipping Fee Logic
+            let shippingFee = 0;
+
+            if (subtotal > 0) {
+                if (subtotal > 10000) {
+                    shippingFee = 500;
+                } else if (subtotal > 2500) {
+                    shippingFee = 300;
+                } else {
+                    shippingFee = 200; // Default base shipping
+                }
+            }
+
+            // Show loading State
+            btnText.innerHTML = "Processing...";
+            if(btnSpinner) btnSpinner.style.display = "inline-block";
+            payBtn.disabled = true; // Prevent multiple clicks
+
+            // 6. Calculate total and convert to Kobo
+            let totalInKobo = Math.round((subtotal + shippingFee) * 100)
+
+            // SYNC DATA TO DJANGO SESSION FIRST
+            try {
+                await syncCartToSession();
+            } catch (err) {
+                alert("Error syncing cart. Please try again.");
+                // Reset button
+                btnText.innerText = "Checkout";
+                payBtn.disabled = false;
+                return;
+            }
+
+            let handler = PaystackPop.setup({
+                key: '{{ paystack_public_key }}',
+                email: '{{ user.email }}',
+                amount: totalInKobo,
+                currency: 'NGN',
+                onClose: function() {
+                    // Reset button if they close the window without paying
+                    btnText.innerText = "Checkout";
+                    if(btnSpinner) btnSpinner.style.display = "none";
+                    payBtn.disabled = false;
+                },
+                callback: function(response) {
+                    // 1. Show the Wait Modal
+                    document.getElementById('waitingModal').style.display = 'flex';
+                    document.body.style.overflow = 'hidden';
+
+                    // 2. Clear Cart and Redirect
+                    localStorage.removeItem('groocyCart'); // Clear cart on success
+
+                    // 3. SILENTLY trigger the verification in the background 
+                    // This creates the Order object in the DB so the polling has something to check
+                    fetch("/verify-payment/" + response.reference + "/", {
+                        method: 'GET',
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest' // Forces Django to send fast JsonResponse
+                        }
+                    })
+                    .then(() => {
+                        // 4. Now that the order exists in the DB, start looking for a courier
+                        startCourierWaitPolling(response.reference);
+                    })
+                    .catch(err => { 
+                        console.error("Order creation failed", err);
+                        // Fallback in case of emergency network drop
+                        window.location.href = `/track-order/${response.reference}/`;
+                    });         
+                }
+            });
+            handler.openIframe();
+        }
+
+        function startCourierWaitPolling(orderRef) {
+            let seconds = 0;
+            const timerElement = document.getElementById('waitTimer');
+
+            const pollInterval = setInterval(async () => {
+                seconds++;
+                let mins = Math.floor(seconds / 60);
+                let secs = seconds % 60;
+                
+                // FIX: Guard clause to prevent "innerText of null"
+                if (timerElement) {
+                    timerElement.innerText = `${mins < 10 ? '0' : ''}${mins}:${secs < 10 ? '0' : ''}${secs}`;
+                }
+
+                try {
+                    // We call a verify endpoint that also checks courier assignment
+                    const res = await fetch(`/api/order-status/${orderRef}/`);
+                    const data = await res.json();
+
+                    // If a courier has been assigned (courier name exists)
+                    if (data.courier_name && data.courier_name !== "") {
+                        clearInterval(pollInterval);
+                        
+                        // Show a quick success message before redirecting
+                        const modalTitle = document.querySelector('#waitingModal h3') || document.querySelector('#waitModal h3');
+                        const modalText = document.querySelector('#waitingModal p') || document.querySelector('#waitModal p');
+                        
+                        if(modalTitle) modalTitle.innerText = "Courier Found!";
+                        if(modalText) modalText.innerText = `${data.courier_name} is handling your order. Redirecting...`;
+                        
+                        setTimeout(() => {
+                            window.location.href = `/track-order/${orderRef}/`;
+                        }, 2000);
+                    }
+                } catch (err) {
+                    console.error("Polling error:", err);
+                }
+            }, 5000); // Poll every 5 seconds
+        }
+
+        // Initialize UI when the DOM is fully loaded
+        document.addEventListener('DOMContentLoaded', () => {
+            if (typeof updateCartUI === "function") updateCartUI();
+
+            // Call this function whenever the page loads
+            checkStockLevels();
+        
+            // FIX: dbAddress logic check
+            const displayAddr = document.getElementById('displayAddress');
+            const addrInput = document.getElementById('addressInput');
+
+            if (dbAddress && dbAddress !== "") {
+                if(displayAddr) displayAddr.innerText = dbAddress;
+                localStorage.setItem('groocyAddress', dbAddress);
+                if(addrInput) addrInput.value = dbAddress;
+            } else {
+                const savedAddr = localStorage.getItem('groocyAddress');
+                if(savedAddr && displayAddr) {
+                    displayAddr.innerText = savedAddr;
+                    if(addrInput) addrInput.value = savedAddr;
+                }
+            }
+                
+        });
+
+        // SCRIPT To combine Text Loaction Halls with Room Numbers
+        function combineAddress() {
+            const hall = document.getElementById('hallSelect').value;
+            const room = document.getElementById('roomInput').value;
+            // Combines them: "John Hall, Room B204"
+            document.getElementById('finalAddressInput').value = `${hall}, Room ${room}`;
+        }
+
+        // 2. Add this to the bottom of home.html script to catch users who refresh mid-process
+        window.onload = function() {
+            // If the page loads and there's a reference in the URL or session, 
+            // you could trigger the modal here, but your View redirect handles 
+            // the hard refreshes already.
+        };
+    </script>
+
+    <div class="drawer-overlay" id="drawerOverlay" onclick="toggleCartDrawer()"></div>
+
+    <!-- Waiting for Courier Modal -->
+    <div id="waitingModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:3000; align-items:center; justify-content:center; text-align:center; color: white;">
+        <div style="background: white; color: #333; padding: 40px; border-radius: 20px; width: 90%; max-width: 400px;">
+            <div class="loader-container" style="margin-bottom: 20px;">
+                <i class="bx bx-loader-circle bx-spin" style="font-size: 4rem; color: #4CAF50;"></i>
+            </div>
+            <h3 style="margin-bottom: 10px;">Finding a Courier...</h3>
+            <p style="color: #666; font-size: 0.9rem;">Please wait while we connect your order to the nearest available courier on campus.</p>
+            <!-- <div id="assignmentStatus" style="margin-top: 15px; font-weight: 600; color: #4CAF50;">
+                Status: Waiting for acceptance
+            </div> -->
+        </div>
+    </div>
+
+    <nav class="bottom-nav">
+        <a href="{% url 'home' %}" class="nav-item {% if request.resolver_match.url_name == 'home' %}active{% endif %}">
+            <i class='bx bx-home-alt'></i>
+            <span>Home</span>
+        </a>
+        
+        <a href="{% url 'orders' %}" class="nav-item {% if request.resolver_match.url_name == 'orders' %}active{% endif %}">
+            <i class='bx bx-shopping-bag'></i>
+            <span>Orders</span>
+        </a>
+
+        <div class="nav-item" onclick="toggleCartDrawer()">
+            <div class="cart-nav-wrapper">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="#888" viewBox="0 0 24 24">
+                    <path d="M2.21 9.39c-.19.25-.25.57-.17.87l2.8 10.26c.24.87 1.03 1.47 1.93 1.47h10.47c.9 0 1.69-.61 1.93-1.47l2.8-10.26c.08-.3.02-.62-.17-.87a.99.99 0 0 0-.79-.39h-1.42l-3.71-6.5-1.74.99 3.15 5.5H6.72l3.15-5.5-1.74-.99L4.42 9H3a1 1 0 0 0-.79.39M17.24 20H6.76l-2.45-9h15.38z"></path>
+                    <path d="M9 13h2v5H9zm4 0h2v5h-2z"></path>
+                </svg> 
+                <span id="mobileCartBadge" class="badge">0</span>
+            </div>
+            <span>Bag</span>
+        </div>
+
+        {% if user.is_staff %}
+        <a href="{% url 'add_product' %}" class="nav-item">
+            <i class='bx bx-shield-quarter'></i>
+            <span>Admin</span>
+        </a>
+        {% endif %}
+
+        <a href="{% url 'profile' %}" class="nav-item {% if request.resolver_match.url_name == 'profile' %}active{% endif %}">
+            <i class='bx bx-user'></i>
+            <span>Profile</span>
+        </a>
+    </nav>
+</body>
+</html>

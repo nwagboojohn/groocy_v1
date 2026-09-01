@@ -1,0 +1,66 @@
+{% load static %}
+{% load tz %}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Orders | Groocy</title>
+    <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
+    <link rel="stylesheet" href="{% static 'css/orders.css' %}">
+    <link rel="shortcut icon" href="{% static 'images/groocy-head-logo.png' %}" type="image/x-icon">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&family=Sora:wght@600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="content">
+        <div class="header-flex">
+            <a href="{% url 'home' %}" class="back-link">
+                <i class='bx bx-chevron-left'></i>
+                <span>Back to Home</span>
+            </a>
+            <h2>My Orders</h2>
+        </div>
+
+        <div class="orders-list">
+            {% for order in orders %}
+            <div class="order-card">
+                <div class="payment-label {% if order.payment_method == 'Online' %}label-online{% else %}label-pod{% endif %}">
+                    {{ order.payment_method }}
+                </div>
+
+                <div class="card-main" style="padding-top: 20px;">
+                    <div class="order-icon">
+                        <i class='bx bx-package'></i>
+                    </div>
+                    <div class="order-primary-info">
+                        <span class="order-id">Ref: {{ order.ref|truncatechars:12|upper }}</span>
+                        <p class="order-date">{{ order.created_at|date:"D, d M Y" }} • {{ order.created_at|date:"g:i A" }}</p>
+                    </div>
+                    <div class="order-price-status">
+                        <p class="order-amount">₦{{ order.amount }}</p>
+                    </div>
+                </div>
+
+                <div class="order-detail-status">
+                    <span class="status-badge {% if order.status == 'In Transit' %}transit{% else %}{{ order.status|lower }}{% endif %}"> 
+                        {{ order.status }}
+                    </span>
+                    <div class="card-footer">
+                        <p class="items-count"><i class='bx bx-eyes'></i></p>
+                        <a href="{% url 'order_detail' order.ref %}" class="view-details-btn">
+                            Order Details <i class='bx bx-right-arrow-alt'></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+            {% empty %}
+            <div class="empty-state" style="display: flex; align-items: center; flex-direction: column; margin: 40px 0;">
+                <p style="text-align: center;"><i class='bx bx-shopping-bag' style="font-size: 2rem; vertical-align: middle; color: #222222;"></i> You haven't placed any orders yet.</p>
+                <a href="{% url 'home' %}" class="btn-shop" style="color: #fff; background: #4CAF50; padding: 10px 20px; border-radius: 50px; margin: 10px 0;">Start Shopping</a>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</body>
+</html>

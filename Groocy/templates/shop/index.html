@@ -1,0 +1,143 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Groocy: Fast-Delivery, Groceries, Essentials</title>
+    <meta name="author" content="Groocy">
+    <meta name="description" content="Groocy is your go-to app for fast delivery, groceries, and essentials.">
+    <link href='https://cdn.boxicons.com/fonts/basic/boxicons.min.css' rel='stylesheet'>
+    <link href='https://cdn.boxicons.com/fonts/brands/boxicons-brands.min.css' rel='stylesheet'>
+    <link rel="stylesheet" href="{% static 'css/landing.css' %}"> 
+    <link rel="shortcut icon" href="{% static 'images/groocy-head-logo.png' %}" type="image/x-icon">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"/>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@100..800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Code+Latin:wght@100..700&family=Quicksand:wght@300..700&family=Sora:wght@100..800&display=swap" rel="stylesheet">
+    <script src="https://js.paystack.co/v1/inline.js"></script>
+</head>
+<body>
+    <header class="hero-section">
+        <nav class="navbar">
+            <img src="{% static 'images/groocy-logo.png' %}" alt="Groocy Logo" class="logo">
+            <div class="nav-links">
+                <a href="{% url 'login' %}" class="btn-secondary">Login</a>
+                <a href="{% url 'signup' %}" class="btn-primary">Get Started</a>
+            </div>
+        </nav>
+
+        <div class="how-it-works-modal" id="videoModal">
+            <div class="modal-content">
+                <span class="close-modal">&times;</span>
+                <h2>Getting your Groocy is easy</h2>
+                
+                <div class="steps-container">
+                    <div class="step">
+                        <div class="step-number">1</div>
+                        <h4>Pick Items</h4>
+                        <p>Choose from 100+ campus essentials.</p>
+                    </div>
+                    <div class="step">
+                        <div class="step-number">2</div>
+                        <h4>Fast Pay</h4>
+                        <p>Pay securely with your card or transfer.</p>
+                    </div>
+                    <div class="step">
+                        <div class="step-number">3</div>
+                        <h4>Grab it!</h4>
+                        <p>Meet your order at your address in < 15 mins.</p>
+                    </div>
+                </div>
+
+                <div class="video-placeholder">
+                    <i class='bx bx-play-circle'></i>
+                    <p>Watch the 30-second demo</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="hero-container">
+            <div class="hero-content">
+                <div class="trust-badge">
+                    <i class="fa-solid fa-bolt"></i>  <span>Fastest Delivery in Campus</span>
+                </div>
+                <h1>Groceries delivered in <span>minutes.</span></h1>
+                <p>Skip the long queues at the campus store. Groocy brings your essentials, snacks, and stationeries straight to your hostel door.</p>
+                
+                <div class="hero-actions">
+                    <a href="/home" class="btn-primary btn-lg">Order Now</a>
+                    <div class="btn-video">
+                        <i class='bx bx-play-circle'></i> See how it works
+                    </div>
+                </div>
+            </div>
+
+            <div class="hero-image">
+                <img src="{% static 'images/hero-image.jpg' %}" alt="Groocy Delivery">
+                <div class="floating-card">
+                    <i class='bx bxs-check-circle'></i>
+                    <span>Order Successful</span>
+                </div>
+            </div>
+        </div>
+
+        <section class="courier-recruitment">
+            <div class="container">
+                <h2 class="section-title">Earn while you move</h2>
+                <div class="benefits-flex">
+                    <div class="benefit-card">
+                        <i class='bx bx-time-five'></i>
+                        <h4>Flexible hours</h4>
+                        <p>Deliver between classes or during weekends.</p>
+                    </div>
+                    <div class="benefit-card">
+                        <i class='bx bx-wallet'></i>
+                        <h4>Instant Pay</h4>
+                        <p>Receive your earnings immediately after delivery.</p>
+                    </div>
+                    <div class="benefit-card">
+                        <i class='bx bx-current-location'></i>
+                        <h4>Stay Local</h4>
+                        <p>Only deliver to halls you already visit.</p>
+                    </div>
+                </div>
+                <div class="cta-center">
+                    <a href="{% url 'courier_signup' %}" class="btn-primary">Get Registered</a>
+                </div>
+            </div>
+        </section>
+    </header>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            const modal = document.getElementById("videoModal");
+            const openBtn = document.querySelector(".btn-video"); // Your "See how it works" button
+            const closeBtn = document.querySelector(".close-modal");
+
+            // Open Modal
+            openBtn.addEventListener("click", (e) => {
+                e.preventDefault(); // Prevents page jump
+                modal.classList.add("show");
+                document.body.style.overflow = "hidden"; // Prevent background scrolling
+            });
+
+            // Close Modal via 'X'
+            closeBtn.addEventListener("click", () => {
+                modal.classList.remove("show");
+                document.body.style.overflow = "auto";
+            });
+
+            // Close Modal by clicking outside the box
+            window.addEventListener("click", (e) => {
+                if (e.target === modal) {
+                    modal.classList.remove("show");
+                    document.body.style.overflow = "auto";
+                }
+            });
+        });
+    </script>
+</body>
+</html>

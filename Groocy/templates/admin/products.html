@@ -1,0 +1,491 @@
+{% extends 'admin/base_admin.html' %}
+{% load static %}
+{% block page_title %}Inventory Management{% endblock %}
+{% block content %}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Groocy Admin</title>
+</head>
+<style>
+    @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+    @keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
+    .modal-overlay { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:9999; align-items:center; justify-content:center; backdrop-filter: blur(4px); }
+    .input-field:focus { border-color: var(--primary) !important; outline: none; box-shadow: 0 0 5px rgba(76, 175, 80, 0.2); }
+    .product-row:hover { background: #fcfcfc; }
+</style>
+
+<body>
+    <!-- SUCCESSFULL TOAST MESSAGES -->
+    <div id="toast" style="display:none; position:fixed; top:20px; right:20px; background:#4CAF50; color:white; padding:15px 25px; border-radius:10px; z-index:10000; box-shadow:0 4px 12px rgba(0,0,0,0.2); animation: slideIn 0.5s;">
+        <i class='bx bxs-check-circle'></i> <span id="toast-msg"></span>
+    </div>
+
+    <!-- ALERT FOR LOW STOCK PRODUCT -->
+    {% if out_of_stock_count > 0 %}
+    <div style="width: fit-content; background: #fff2f2; color: #d32f2f; padding:15px; border: 1px solid #ffdede; border-radius:12px; margin-bottom:10px; border-left: 5px solid #d32f2f;">
+        <i class='bx bxs-x-circle' style="vertical-align: middle;"></i> 
+        <b>Attention:</b> 
+        <span>({% for item in out_of_stock_items %}{{ item.name }}{% if not forloop.last %}, {% endif %}{% endfor %})</span>
+        {% if out_of_stock_count == 1 %} is {% else %} are {% endif %} completely out of stock! 
+    </div>
+    {% endif %}
+
+    {% if low_stock_count > 0 %}
+    <div style="width: fit-content; background:#fff7ea; color:#e18a08; padding:15px; border-radius:12px; margin-bottom:20px; border: 1px solid #ffe4bc; border-left: 5px solid #e18a08;">
+        <i class='bx bxs-error-circle' style="vertical-align: middle;"></i> <b>Attention:</b> {{ low_stock_count }} {% if low_stock_count == 1 %} item is {% else %} items are {% endif %} low on stock! 
+        ({% for item in low_stock_items %}{{ item.name }}{% if not forloop.last %}, {% endif %}{% endfor %})
+    </div>
+    {% endif %}
+
+    <!-- SEARCH PRODUCT FIELD WITH QUICK RESTOCK & ADD PRODUCT BUTTONS -->
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; gap: 20px;">
+        <div style="position: relative; flex-grow: 1; max-width: 500px;">
+            <i class='bx bx-search' style="position: absolute; left: 15px; top: 50%; transform: translateY(-50%); color: #888; font-size: 1.2rem;"></i>
+            <!-- <input type="text" id="productSearch" onkeyup="filterProducts()" placeholder="Search product name or SKU..."  -->
+            <input type="text" id="productSearch" onkeyup="filterProducts()" placeholder="Search product name..." 
+                style="width: 100%; padding: 15px 15px 15px 45px; font-size: 15px; font-weight: 500; border-radius: 10px; border: 1px solid #ddd; outline: none; transition: 0.3s; box-shadow: var(--shadow);">
+
+            <!-- Unit Type Dropdown Filter -->
+            <select id="unitFilter" onchange="filterProducts()" class="input-field">
+                <option value="all">All Units</option>
+                <option value="piece">Piece</option>
+                <option value="pack">Pack</option>
+                <option value="carton">Carton</option>
+            </select>
+        </div>
+        <div style="display: flex; gap: 10px;">
+            <button onclick="toggleRestockMode()" id="restockBtn" class="btn-primary" style="background: #6c757d; border: none;">Quick Restock</button>
+            <button onclick="document.getElementById('addModal').style.display='flex'" class="btn-primary" style="border: none;">+ Add New Product</button>
+        </div>
+    </div>
+
+    <!-- PRODUCT SECTION AND ADD CATEGORY SECTION -->
+    <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h3>All Products</h3>
+        </div>
+
+        <h4>Manage Categories</h4>
+        <div style="display: flex; gap: 10px; margin-bottom: 20px; align-items: center;">
+            <input type="text" id="newCatName" placeholder="New Category Name" class="input-field" style="margin-bottom: 0px;">
+            <button onclick="submitNewCategory()" class="btn-primary" style="white-space: nowrap;">Add New Category</button>
+        </div>
+
+        <div id="categoryContainer" style="display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0;">
+            {% for cat in categories %}
+                <span id="cat-item-{{ cat.id }}" style="background: #eee; padding: 5px 12px; border-radius: 15px; font-size: 0.85rem;">
+                    {{ cat.name }} 
+                    <a href="javascript:void(0)" onclick="removeCategory('{{ cat.id }}')" style="color: #ff4d4d; margin-left: 5px; text-decoration: none; font-weight: bold;">&times;</a>
+                </span>
+            {% endfor %}
+        </div>
+
+        <form id="bulkRestockForm">
+            {% csrf_token %}
+            <table width="100%" style="border-collapse: collapse;">
+                <thead>
+                    <tr style="text-align: left; border-bottom: 2px solid #eee; color: #777; font-size: 0.9rem;">
+                        <th style="padding: 15px;">Product</th>
+                        <th>Unit</th>
+                        <th>Price</th>
+                        <th>Stock Level</th>
+                        <th>Status</th>
+                        <th style="text-align: right; padding-right: 15px;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="inventoryTable">
+                    {% for p in products %}
+                    <tr class="product-row" data-name="{{ p.name|lower }}" data-unit="{{ p.unit_type|lower }}" data-category="{% if p.category %}{{ p.category.id }}{% endif %}" style="border-bottom: 1px solid #f4f4f4; transition: 0.2s;">
+                        <td style="padding: 12px; display: flex; align-items: center; gap: 15px;">
+                            <img src="{{ p.image.url }}" style="width: 45px; height: 45px; border-radius: 8px; object-fit: cover; border: 1px solid #eee;">
+                            <span style="font-weight: 500;">{{ p.name }}</span>
+                        </td>
+                        <td><span style="background: #f0f0f0; padding: 3px 8px; border-radius: 4px; font-size: 0.8rem;">{{ p.unit_type }}</span></td>
+                        <td>₦{{ p.price }}</td>
+                        <td class="stock-cell" data-id="{{ p.id }}">{{ p.instock }}</td>
+                        <td>
+                            {% if p.instock == 0 %}
+                                <span style="background: #ffebee; color: #c62828; padding: 4px 8px; border-radius: 6px; font-size: 0.75rem; font-weight: 600;">Out of Stock</span>
+                            {% elif p.instock < 10 %}
+                                <span style="background:#fff7ea; color:#e18a08; padding: 4px 8px; border-radius: 6px; font-size: 0.75rem; font-weight: 600;">Low Stock</span>
+                            {% else %}
+                                <span style="background: #e8f5e9; color: #2e7d32; padding: 4px 8px; border-radius: 6px; font-size: 0.75rem; font-weight: 600;">Healthy</span>
+                            {% endif %}
+                        </td>
+                        <td style="text-align: right; padding-right: 15px;">
+                            <i class='bx bx-edit-alt' onclick="openEditModal('{{p.id}}','{{p.name|escapejs}}','{{p.price}}','{{p.instock}}','{{p.image.url}}', '{{p.category.id}}', '{{p.unit_type}}')" 
+                                style="cursor:pointer; color: var(--primary); font-size: 1.4rem; padding: 5px; border-radius: 5px; transition: 0.2s;"></i>
+
+                            <i class='bx bx-trash' onclick="confirmDelete('{{p.id}}', '{{p.name|escapejs}}')" 
+                                style="cursor:pointer; color: #e53935; font-size: 1.4rem; padding: 5px; transition: 0.2s; margin-left: 10px;"></i>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <button type="submit" id="saveBulkBtn" class="btn-primary" style="display:none; width: 100%; margin-top: 20px; padding: 15px 0; border: none;">Save All Stock Changes</button>
+        </form>
+    </div>
+
+    <!-- POP UP TO ADD NEW PRODUCT -->
+    <div id="addModal" class="modal-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:9999; align-items:center; justify-content:center; backdrop-filter: blur(4px);">
+        <div class="card" style="width: 450px; position: relative; animation: slideUp 0.3s;">
+            <h3 style="margin-top: 0; font-family: 'Sora';">Add New Product</h3>
+            <form id="addForm" enctype="multipart/form-data">
+                {% csrf_token %}
+                <div style="text-align: center; margin-bottom: 20px;">
+                    <label for="add_image_input" style="cursor: pointer;">
+                        <img id="add_preview" src="{% static 'images/placeholder-img.png' %}" style="width: 120px; height: 120px; border-radius: 12px; object-fit: cover; border: 2px dashed #ccc;">
+                        <p style="font-size: 0.8rem; color: var(--primary); margin-top: 5px;">Click to upload image</p>
+                    </label>
+                    <input type="file" id="add_image_input" name="image" onchange="previewImg(this, 'add_preview')" hidden required>
+                </div>
+                <input type="text" name="name" class="input-field" placeholder="Product Name" required style="margin-bottom: 15px; width: 95%; padding: 10px; border-radius: 8px; border: 1px solid #ddd;">
+
+                <!-- ADD UNIT TYPE SELECTION -->
+                <div style="display: flex; gap: 15px; margin-bottom: 15px;">
+                    <select name="category" class="input-field" required style="flex: 1; padding: 10px; border-radius: 8px; border: 1px solid #ddd; background: white;">
+                        <option value="" disabled selected>Select Category</option>
+                        {% for cat in categories %}
+                            <option value="{{ cat.id }}">{{ cat.name }}</option>
+                        {% endfor %}
+                    </select>
+                    <select name="unit_type" class="input-field" required style="flex: 1; padding: 10px; border-radius: 8px; border: 1px solid #ddd; background: white;">
+                        <option value="Piece" selected>Piece</option>
+                        <option value="Pack">Pack</option>
+                        <option value="Carton">Carton</option>
+                    </select>
+                </div>
+
+                <div style="display: flex; gap: 15px; margin-bottom: 20px;">
+                    <input type="number" min="1" name="price" placeholder="Price (₦)" required style="flex: 1; padding: 10px; border-radius: 8px; border: 1px solid #ddd;">
+                    <input type="number" min="1" name="instock" placeholder="Initial Stock" required style="flex: 1; padding: 10px; border-radius: 8px; border: 1px solid #ddd;">
+                </div>
+                <button type="submit" class="btn-primary" style="width: 100%; border: none; padding: 12px;">Create Product</button>
+            </form>
+            <button onclick="document.getElementById('addModal').style.display='none'" style="position:absolute; top:15px; right:15px; border:none; background:none; cursor:pointer; font-size: 1.8rem; color: #999;">&times;</button>
+        </div>
+    </div>
+
+    <!-- POP UP TO DELETE PRODUCT -->
+    <div id="deleteModal" class="modal-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:9999; align-items:center; justify-content:center; backdrop-filter: blur(4px);">
+        <div class="card" style="width: 350px; text-align: center; animation: slideUp 0.3s; padding: 30px;">
+            <i class='bx bx-error-circle' style="font-size: 4rem; color: #ff5252; margin-bottom: 15px;"></i>
+            <h3 style="margin-bottom: 10px;">Confirm Delete</h3>
+            <p style="color: #666; margin-bottom: 25px;">Are you sure you want to delete <br><strong id="deleteProductName" style="color: #333;"></strong>?</p>
+            
+            <div style="display: flex; gap: 10px;">
+                <button onclick="closeDeleteModal()" class="btn-primary" style="background: #eee; color: #333; flex: 1; border: none;">Cancel</button>
+                <button id="confirmDeleteBtn" class="btn-primary" style="background: #d32f2f; flex: 1; border: none;">Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- POP UP TO DELETE CATEGORY -->
+    <div id="deleteCategoryModal" class="modal-overlay">
+        <div class="card" style="width: 350px; text-align: center; animation: slideUp 0.3s; padding: 30px;">
+            <i class='bx bx-trash' style="font-size: 4rem; color: #ff5252; margin-bottom: 15px;"></i>
+            <h3 style="margin-bottom: 10px;">Delete Category?</h3>
+            <p style="color: #666; margin-bottom: 25px;">This will not delete products, but they will no longer have a category.</p>
+            
+            <div style="display: flex; gap: 10px;">
+                <button onclick="closeCatDeleteModal()" class="btn-primary" style="background: #eee; color: #333; flex: 1; border: none;">Cancel</button>
+                <button id="confirmDeleteCatBtn" class="btn-primary" style="background: #d32f2f; flex: 1; border: none;">Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- POP UP TO EDIT PRODUCT  -->
+    <div id="editModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; align-items:center; justify-content:center;">
+        <div class="card" style="width: 400px; position: relative;">
+            <h3>Edit Product</h3>
+            <form id="editForm">
+                <img id="edit_preview" src="" style="width: 100px; height: 100px; display: block; margin: 0 auto 15px; border-radius: 10px; border: 2px dashed #ddd;">
+                <input type="file" onchange="previewImg(this, 'edit_preview')" name="image" class="input-field" style="width: 95%;">
+                <input type="hidden" name="product_id" id="edit_id">
+                <input type="text" name="name" id="edit_name" class="input-field" placeholder="Name" style="width: 95%;">
+
+                <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                    <select name="category" id="edit_category" class="input-field" required style="width: 50%; padding: 10px; border-radius: 8px; border: 1px solid #ddd; background: white;">
+                        <option value="" disabled selected>Category</option>
+                        {% for cat in categories %}
+                            <option value="{{ cat.id }}">{{ cat.name }}</option>
+                        {% endfor %}
+                    </select>
+                    <!-- ADD EDIT UNIT TYPE -->
+                    <select name="unit_type" id="edit_unit_type" class="input-field" required style="width: 50%; padding: 10px; border-radius: 8px; border: 1px solid #ddd; background: white;">
+                        <option value="Piece">Piece</option>
+                        <option value="Pack">Pack</option>
+                        <option value="Carton">Carton</option>
+                    </select>
+                </div>
+
+                <input type="number" min="1" name="price" id="edit_price" class="input-field" placeholder="Price" style="width: 95%;">
+                <input type="number" min="1" name="instock" id="edit_stock" class="input-field" placeholder="Stock" style="width: 95%;">
+                <button type="submit" class="btn-primary" style="width: 100%;">Save Changes</button>
+            </form>
+            <button onclick="document.getElementById('editModal').style.display='none'" style="position:absolute; top:10px; right:10px; border:none; background:none; font-size: 1.85rem; cursor: pointer;">&times;</button>
+        </div>
+    </div>
+
+</body>
+</html>
+
+
+<script>
+    // --- TOAST POP UP LOGIC ---
+    function showToast(msg, color = '#4CAF50') {
+        const toast = document.getElementById('toast');
+        const toastMsg = document.getElementById('toast-msg');
+
+        toast.style.background = color; // Dynamically change color
+        toastMsg.innerText = msg;
+        toast.style.display = 'block';
+
+        setTimeout(() => { toast.style.display = 'none'; }, 3000);
+    }
+
+    // --- SEARCH FILTER ---
+    // function filterProducts() {
+    //     let input = document.getElementById('productSearch').value.toLowerCase();
+    //     let rows = document.querySelectorAll('.product-row');
+
+    //     rows.forEach(row => {
+    //         let name = row.getAttribute('data-name') || '';
+    //         let unit = row.getAttribute('data-unit') || '';
+
+    //         let matches = name.includes(input) || unit.includes(input);
+    //         row.style.display = matches ? "" : "none";
+    //     });
+    // }
+
+    function filterProducts() {
+        let searchInput = document.getElementById('productSearch').value.toLowerCase().trim();
+        let selectedUnit = document.getElementById('unitFilter') ? document.getElementById('unitFilter').value.toLowerCase() : 'all';
+        
+        let rows = document.querySelectorAll('.product-row');
+
+        rows.forEach(row => {
+            let name = row.getAttribute('data-name') || '';
+            let unit = row.getAttribute('data-unit') || '';
+
+            let matchesSearch = name.includes(searchInput);
+            let matchesUnit = (selectedUnit === 'all') || (unit === selectedUnit);
+
+            row.style.display = (matchesSearch && matchesUnit) ? "" : "none";
+        });
+    }
+
+    function previewImg(input, targetId) {
+        if (input.files && input.files[0]) {
+            let reader = new FileReader();
+            reader.onload = e => document.getElementById(targetId).src = e.target.result;
+            reader.readAsDataURL(input.files[0]);
+        }
+    }
+
+    function openEditModal(id, name, price, stock, imageUrl, categoryId, unitType) {
+        document.getElementById('edit_id').value = id;
+        document.getElementById('edit_name').value = name;
+        document.getElementById('edit_price').value = price;
+        document.getElementById('edit_stock').value = stock;
+        document.getElementById('edit_preview').src = imageUrl;
+        document.getElementById('edit_category').value = categoryId;
+        
+        // Populate the correct Unit Type
+        document.getElementById('edit_unit_type').value = unitType || 'Piece';
+        
+        document.getElementById('editModal').style.display = 'flex';
+    }
+
+    // --- QUICK RESTOCK LOGIC ---
+    let editMode = false;
+    function toggleRestockMode() {
+        editMode = !editMode;
+        document.getElementById('saveBulkBtn').style.display = editMode ? 'block' : 'none';
+        document.querySelectorAll('.stock-cell').forEach(cell => {
+            if(editMode) {
+                let pId = cell.getAttribute('data-id');
+                cell.innerHTML = `<input type="number" name="stock_${pId}" value="${cell.innerText.trim()}" style="width:60px;">`;
+            } else { location.reload(); }
+        });
+    }
+
+    // ADD NEW PRODUCT AJAX
+    document.getElementById('addForm').onsubmit = function(e) {
+        e.preventDefault();
+        let formData = new FormData(this);
+        fetch("{% url 'add_product' %}", {
+            method: 'POST',
+            body: formData,
+            headers: {'X-CSRFToken': '{{ csrf_token }}'}
+        }).then(res => res.json()).then(data => {
+            if(data.status === 'success') {
+                showToast(data.message);
+                setTimeout(() => location.reload(), 1500);
+            }
+        });
+    };
+
+    // EDIT PRODUCT AJAX
+    document.getElementById('editForm').onsubmit = function(e) {
+        e.preventDefault();
+        let formData = new FormData(this);
+        fetch("{% url 'edit_product_ajax' %}", {
+            method: 'POST',
+            body: formData,
+            headers: {'X-CSRFToken': '{{ csrf_token }}'}
+        }).then(res => res.json()).then(data => {
+            if(data.status === 'success') {
+                showToast(data.message);
+                setTimeout(() => location.reload(), 1000);
+            }
+        });
+    };
+
+    // BULK RESTOCK AJAX
+    document.getElementById('bulkRestockForm').onsubmit = function(e) {
+        e.preventDefault();
+        let formData = new FormData(this);
+        fetch("{% url 'bulk_restock' %}", {
+            method: 'POST',
+            body: formData,
+            headers: {'X-CSRFToken': '{{ csrf_token }}'}
+        }).then(res => res.json()).then(data => {
+            if(data.success) {
+                showToast("Stock levels updated!");
+                setTimeout(() => location.reload(), 1000);
+            }
+        });
+    };
+
+
+    // --- PRODUCT DELETE LOGIC ---
+    let productToDelete = null;
+
+    function confirmDelete(id, name) {
+        productToDelete = id;
+        document.getElementById('deleteProductName').innerText = name;
+        document.getElementById('deleteModal').style.display = 'flex';
+    }
+
+    function closeDeleteModal() {
+        document.getElementById('deleteModal').style.display = 'none';
+        productToDelete = null;
+    }
+
+    document.getElementById('confirmDeleteBtn').onclick = function() {
+        if (!productToDelete) return;
+
+        fetch(`/groocy-admin/delete-product/${productToDelete}/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}',
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                closeDeleteModal();
+                showToast("Product deleted successfully!"); // Using your existing toast function
+                setTimeout(() => {
+                    location.reload(); 
+                }, 1500);
+            } else {
+                alert("Error deleting product: " + data.message);
+            }
+        });
+    };
+
+
+    // 2. Open the Modal instead of a simple confirm()
+    function removeCategory(id) {
+        catToDelete = id;
+        document.getElementById('deleteCategoryModal').style.display = 'flex';
+    }
+
+    function closeCatDeleteModal() {
+        document.getElementById('deleteCategoryModal').style.display = 'none';
+        catToDelete = null;
+    }
+
+    // Handle the actual deletion
+    document.getElementById('confirmDeleteCatBtn').onclick = function() {
+        if (!catToDelete) return;
+
+        // Correct URL prefix: /groocy-admin/
+        fetch(`/groocy-admin/delete-category/${catToDelete}/`, {
+            method: "POST",
+            headers: { "X-CSRFToken": "{{ csrf_token }}" }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                // Remove from the UI list
+                const item = document.getElementById(`cat-item-${catToDelete}`);
+                if(item) item.remove();
+                
+                // Remove from the dropdowns
+                document.querySelectorAll(`option[value="${catToDelete}"]`).forEach(opt => opt.remove());
+                
+                closeCatDeleteModal();
+                showToast("Category Permanently Removed");
+            }
+        })
+        .catch(err => console.error("Error:", err));
+    };
+
+    // Fixed submitNewCategory to ensure dynamic update
+    function submitNewCategory() {
+        const nameInput = document.getElementById('newCatName');
+        const name = nameInput.value.trim();
+        if (!name) return;
+
+        fetch("{% url 'add_category' %}", {
+            method: "POST",
+            headers: {
+                "X-CSRFToken": "{{ csrf_token }}",
+                "Content-Type": "application/x-www-form-urlencoded",
+            },
+            body: `cat_name=${name}`
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'exists') {
+                // Show a Red toast for duplicates
+                showToast(data.message, '#e53935'); 
+                nameInput.value = '';
+            }
+            else if (data.status === 'success') {
+                const container = document.getElementById('categoryContainer');
+                const newSpan = `
+                    <span id="cat-item-${data.id}" style="background: #eee; padding: 5px 12px; border-radius: 15px; font-size: 0.85rem;">
+                        ${data.name} 
+                        <a href="javascript:void(0)" onclick="removeCategory('${data.id}')" style="color: #ff4d4d; margin-left: 5px; text-decoration: none; font-weight: bold;">&times;</a>
+                    </span>`;
+                container.insertAdjacentHTML('beforeend', newSpan);
+
+                // Update both Select Dropdowns immediately
+                const dropdowns = [document.querySelector('select[name="category"]'), document.getElementById('edit_category')];
+                dropdowns.forEach(select => {
+                    if(select) {
+                        const opt = document.createElement('option');
+                        opt.value = data.id;
+                        opt.text = data.name;
+                        select.add(opt);
+                    }
+                });
+
+                // 3. Clear and Show Toast
+                nameInput.value = '';
+                showToast(data.message); // Default Green  toast
+            }
+        });
+    }
+</script>
+{% endblock %}

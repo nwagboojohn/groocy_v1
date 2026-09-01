@@ -1,0 +1,179 @@
+:root {
+    --primary: #27ae60;
+    --primary-dark: #1e8449;
+    --text-dark: #1a1a1a;
+    --text-light: #636e72;
+    --white: #ffffff;
+}
+
+*{
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: "Poppins", sans-serif;
+}
+
+a{
+    color: inherit;
+    text-decoration: none;
+}
+
+/* style for signup section */
+.sign-up{
+    width: 100%;
+    height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 30px 5%;
+    flex-direction: column;
+}
+
+.logo{
+    width: 140px;
+}
+
+.sign-up h2{
+    font-size: 25px;
+    font-weight: 500;
+    margin-top: 20px;
+}
+
+.alert {
+    padding: 12px;
+    margin-bottom: 1rem;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    text-align: center;
+    border: 1px solid transparent;
+}
+
+.alert-success {
+    color: #155724;
+    background-color: #d4edda;
+    border-color: #c3e6cb;
+}
+
+.alert-error, .alert-danger {
+    color: #721c24;
+    background-color: #f8d7da;
+    border-color: #f5c6cb;
+}
+
+.form-detail{
+    width: 100%;
+    max-width: 500px;
+    display: block;
+}
+
+.form-detail label {
+    display: block;
+    font-size: 0.95rem;
+    font-weight: 700;
+    margin: 10px 0;
+    margin-bottom: 8px;
+    color: #444;
+}
+
+
+/* Customizing Django's default widget output */
+.form-detail .input-field, 
+.form-detail select, 
+.form-input {
+    width: 100%;
+    padding: 12px 15px;
+    font-size: 15px;
+    font-weight: 600;
+    border: 2px solid #f0f0f0;
+    border-radius: 10px;
+    transition: all 0.3s ease;
+    background: #fafafa;
+}
+
+.form-detail input:focus {
+    border-color: var(--primary);
+    background: white;
+    outline: none;
+    box-shadow: 0 0 0 4px rgba(39, 174, 96, 0.1);
+}
+
+.error{
+    color: #cf1e1e;
+    font-size: 0.85rem;
+}
+
+.text-field{
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+}
+
+.text-field label{
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.text-field .password-fill{
+    display: flex;
+    align-items: center;
+    background: #f0f0f0;
+    border-radius: 7px;
+}
+
+.password-fill p{
+    font-size: 15px;
+    font-weight: 600;
+    margin: 0 15px;
+    cursor: pointer;
+}
+
+/* Submit Button */
+.submit-btn {
+    width: 100%;
+    background: var(--primary);
+    color: white;
+    border: none;
+    padding: 15px;
+    border-radius: 12px;
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+    transition: transform 0.2s, background 0.2s;
+    margin-top: 25px;
+}
+
+.submit-btn:hover {
+    background: var(--primary-dark);
+    transform: translateY(-2px);
+}
+
+.submit-btn:active {
+    transform: translateY(0);
+}
+
+.navigation-link{
+    font-size: 16px;
+    font-weight: 600;
+    margin-top: 15px;
+}
+
+.navigation-link a{
+    color: var(--primary);
+    text-decoration: underline;
+}
+
+@media (max-width: 777px){
+    .sign-up{
+        width: 100%;
+        height: 130vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 30px 5%;
+        flex-direction: column;
+    }
+}

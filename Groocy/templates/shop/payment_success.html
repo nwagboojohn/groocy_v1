@@ -1,0 +1,317 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Thank You | Groocy</title>
+    <link rel="shortcut icon" href="{% static 'images/groocy-head-logo.png' %}" type="image/x-icon">
+    <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
+    <style>
+        :root {
+            --bg-color: #f4f7f6;
+            --text-main: #1a1a1a;
+            --text-muted: #888;
+            --primary: #4CAF50;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            padding: 20px;
+        }
+
+        /* --- Ticket Container --- */
+        .ticket {
+            background: #ffffff;
+            width: 100%;
+            max-width: 360px;
+            border-radius: 16px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.06);
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* --- Header: Celebration --- */
+        .ticket-header {
+            text-align: center;
+            padding: 40px 30px 20px;
+        }
+
+        .ticket-header .emoji {
+            font-size: 40px;
+            margin-bottom: 10px;
+            display: block;
+        }
+
+        .ticket-header h1 {
+            font-size: 1.5rem;
+            color: var(--text-main);
+            margin: 0 0 8px 0;
+            font-weight: 700;
+        }
+
+        .ticket-header p {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin: 0;
+            line-height: 1.4;
+        }
+
+        /* --- The Dashed Divider Cutout --- */
+        .ticket-divider {
+            border-top: 2px dashed #eaeaea;
+            margin: 10px 0;
+            position: relative;
+        }
+
+        .ticket-divider::before, .ticket-divider::after {
+            content: '';
+            position: absolute;
+            top: -10px;
+            width: 20px;
+            height: 20px;
+            background-color: var(--bg-color);
+            border-radius: 50%;
+        }
+
+        .ticket-divider::before { left: -10px; }
+        .ticket-divider::after { right: -10px; }
+
+        /* --- Details Section --- */
+        .ticket-body {
+            padding: 20px 30px;
+        }
+
+        .detail-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 25px;
+        }
+
+        .detail-item {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .detail-item.right { text-align: right; }
+
+        .detail-item span {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 5px;
+        }
+
+        .detail-item strong {
+            font-size: 0.95rem;
+            color: var(--text-main);
+        }
+
+        /* --- Payment Card Block --- */
+        .payment-method {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 15px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        .payment-method i {
+            font-size: 1.5rem;
+            color: #555;
+        }
+
+        .payment-method div {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .payment-method div strong {
+            font-size: 0.9rem;
+            color: var(--text-main);
+        }
+
+        .payment-method div span {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        /* --- CSS Barcode Generation --- */
+        .barcode {
+            height: 50px;
+            width: 100%;
+            background-image: repeating-linear-gradient(
+                to right,
+                #1a1a1a 0, #1a1a1a 3px, transparent 3px, transparent 6px,
+                #1a1a1a 6px, #1a1a1a 7px, transparent 7px, transparent 11px,
+                #1a1a1a 11px, #1a1a1a 15px, transparent 15px, transparent 18px,
+                #1a1a1a 18px, #1a1a1a 20px, transparent 20px, transparent 25px
+            );
+            background-size: 25px 100%;
+            margin-bottom: 10px;
+        }
+
+        .barcode-numbers {
+            font-family: monospace;
+            font-size: 0.8rem;
+            letter-spacing: 5px;
+            color: var(--text-muted);
+            text-align: center;
+            display: block;
+        }
+
+        /* --- Footer Actions --- */
+        .ticket-footer {
+            padding: 0 30px 30px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .btn {
+            padding: 14px;
+            border-radius: 10px;
+            border: none;
+            font-weight: 600;
+            font-size: 0.95rem;
+            cursor: pointer;
+            text-align: center;
+            text-decoration: none;
+            transition: 0.2s;
+        }
+
+        .btn-rate { background: #e8f5e9; color: #2e7d32; }
+        .btn-rate:hover { background: #c8e6c9; }
+        .btn-home { background: transparent; color: var(--text-muted); }
+        .btn-home:hover { color: var(--text-main); }
+
+        /* Rating Logic Styles */
+        .rating-box {
+            display: none;
+            flex-direction: column;
+            gap: 10px;
+            margin-top: 10px;
+            animation: fadeIn 0.3s ease;
+        }
+
+        textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            resize: none;
+            font-family: inherit;
+            box-sizing: border-box;
+        }
+
+        textarea:focus { outline: none; border-color: var(--primary); }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body>
+
+    <div class="ticket">
+        <div class="ticket-header">
+            <span class="emoji">🎉</span>
+            <h1>Thank you!</h1>
+            <p>Your items have been delivered successfully.</p>
+        </div>
+
+        <div class="ticket-divider"></div>
+
+        <div class="ticket-body">
+            <div class="detail-row">
+                <div class="detail-item">
+                    <span>TRANSACTION REF</span>
+                    <strong>{{ order.ref }}</strong>
+                </div>
+                <div class="detail-item right">
+                    <span>Amount</span>
+                    <strong>₦{{ order.amount|floatformat:2 }}</strong>
+                </div>
+            </div>
+
+            <div class="detail-row">
+                <div class="detail-item">
+                    <span>DATE & TIME</span>
+                    <strong>{{ order.delivered_at|date:"d M Y" }} • {{ order.delivered_at|time:"g:i A" }}</strong>
+                </div>
+            </div>
+
+            <div class="payment-method">
+                <i class='bx bxs-credit-card'></i>
+                <div>
+                    <strong>Payment Settled</strong>
+                    <span>Paystack Secure Checkout</span>
+                </div>
+            </div>
+
+            <div class="barcode"></div>
+            <span class="barcode-numbers">8937261 273610</span>
+        </div>
+
+        <div class="ticket-footer">
+            <button id="rateBtn" class="btn btn-rate" onclick="toggleRating()">Rate this delivery</button>
+            
+            <div id="ratingBox" class="rating-box">
+                <form id="ratingForm">
+                    {% csrf_token %}
+                    <textarea name="experience" id="experienceText" rows="3" placeholder="How did {{ order.courier.username }} do?" required></textarea>
+                    <button type="button" onclick="submitRating()" class="btn" style="background: var(--text-main); color: white; width: 100%;">Submit Feedback</button>
+                </form>
+            </div>
+
+            <a href="{% url 'home' %}" class="btn btn-home">Return to Home</a>
+        </div>
+    </div>
+
+    <script>
+        function toggleRating() {
+            const btn = document.getElementById('rateBtn');
+            const box = document.getElementById('ratingBox');
+            btn.style.display = 'none';
+            box.style.display = 'flex';
+        }
+
+        async function submitRating() {
+            const text = document.getElementById('experienceText').value;
+            const formContainer = document.getElementById('ratingBox');
+            
+            if(!text.trim()) return alert("Please enter your feedback!");
+
+            const formData = new FormData(document.getElementById('ratingForm'));
+
+            try {
+                // Keep your existing API logic
+                const response = await fetch(`/submit-rating/{{ order.ref }}/`, {
+                    method: "POST",
+                    body: formData,
+                    headers: { "X-Requested-With": "XMLHttpRequest" }
+                });
+
+                if(response.ok) {
+                    // Replaces the form with a seamless thank you note
+                    formContainer.innerHTML = `
+                        <div style="text-align: center; color: #2e7d32; padding: 10px; background: #e8f5e9; border-radius: 8px;">
+                            <i class='bx bxs-check-circle'></i> Feedback recorded. Thank you!
+                        </div>
+                    `;
+                }
+            } catch (err) {
+                alert("Connection error. Try again.");
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,199 @@
+{% load static %}
+{% load humanize %}
+{% load tz %}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Order Details | Groocy</title>
+    <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
+    <link rel="shortcut icon" href="{% static 'images/groocy-head-logo.png' %}" type="image/x-icon">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&family=Sora:wght@600;700&display=swap" rel="stylesheet">
+</head>
+<style>
+    .status-badge {
+        padding: 4px 12px;
+        border-radius: 8px;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+
+    @media print {
+        .back-link, button, .bx-arrow-back {
+            display: none !important;
+        }
+        .detail-container {
+            border: none !important;
+            margin: 0 !important;
+            width: 100% !important;
+            max-width: none !important;
+        }
+    }
+
+    /* Base badge structure */
+    .status-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 14px;
+        border-radius: 50px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        text-transform: capitalize;
+    }
+
+    /* 1. Accepted / Received (Waiting for action) */
+    .status-badge.accepted,
+    .status-badge.pending { 
+        background: #fff3cd; 
+        color: #856404; 
+    }
+
+    /* 2. Packing Order (In progress inside store) */
+    .status-badge.packing,
+    .status-badge.processing { 
+        background: #cce5ff; 
+        color: #004085; 
+    }
+
+    /* 3. Out for Delivery (In transit across campus) */
+    .status-badge.transit { 
+        background: #e2e5ff; 
+        color: #2b3db5; 
+    }
+
+    /* 4. Successfully Delivered (Mission Complete) */
+    .status-badge.delivered,
+    .status-badge.ready { 
+        background: #daf9e1; 
+        color: #155724; 
+    }
+
+    /* 5. Cancelled (Customer or Courier side abort) */
+    .status-badge.cancelled { 
+        background: #fde4e4; 
+        color: #e74c3c; 
+    }
+</style>
+<body>
+    <div class="detail-container" style="max-width: 500px; margin: 20px auto; font-family: 'Poppins', sans-serif; padding: 20px; border: 1px solid #eee; border-radius: 15px;">
+        <div style="text-align: center; margin-bottom: 20px;">
+            <h2 style="font-family: 'Sora'; margin-bottom: 5px;">Order Details</h2>
+            <span class="status-badge {{ order.status|lower }}" style="padding: 5px 15px; border-radius: 20px; font-size: 0.8rem; font-weight: 600;">
+                {{ order.status|upper }}
+            </span>
+        </div>
+
+        <div style="background: #e8f5e9; padding: 15px; border-radius: 10px; margin-bottom: 20px; display: flex; align-items: flex-start; gap: 10px;">
+            <i class='bx bx-map' style="color: #4CAF50; font-size: 1.2rem; margin-top: 2px;"></i>
+            <div>
+                <h4 style="margin: 0; font-size: 0.9rem; color: #2e7d32;">Delivery Address</h4>
+                <p style="margin: 3px 0 0; font-size: 0.85rem; color: #444; line-height: 1.4;">
+                    {# Use order.address first! It is the permanent record for THIS purchase #}
+                    {{ order.address|default:order.user.profile.address|default:"No address recorded" }}
+                </p>
+            </div>
+        </div>
+
+        <div style="border-top: 2px dashed #eee; padding: 15px 0;">
+            <p style="margin: 4px 0;"><strong>Reference:</strong> {{ order.ref }}</p>
+            <p style="margin: 10px 0;"><strong>Date:</strong> {{ order.created_at|date:"F j, Y, g:i a" }}</p>
+            <p style="margin: 4px 0;"><strong>Payment Method:</strong> 
+                <span style="font-weight: 600; color: {% if order.payment_method == 'POD' %}#d97706{% else %}#2e7d32{% endif %};">
+                    {{ order.payment_method|default:"Online" }}
+                </span>
+            </p>
+        </div>
+
+        <div style="background: #f9f9f9; padding: 15px; border-radius: 10px;">
+            <h4 style="margin-top: 0;">Items</h4>
+
+            <div style="margin-bottom: 15px;">
+                {% for item in order.items.all %}
+                <div style="display: flex; align-items: center; justify-content: space-between; font-size: 0.9rem; margin-bottom: 12px; color: #191919;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <div style="width: 40px; height: 40px; background: #eee; border-radius: 6px; overflow: hidden; flex-shrink: 0;">
+                            {% if item.product_image %}
+                                <img src="{{ item.product_image }}" style="width: 100%; height: 100%; object-fit: cover;">
+                            {% else %}
+                                <img src="{% static 'images/placeholder.png' %}" style="width: 100%; height: 100%; object-fit: cover;">
+                            {% endif %}
+                        </div>
+                        <div>
+                            <p style="margin: 0; font-weight: 600;">{{ item.product_name }}</p>
+                            <small style="color: #6f6f6f;">Qty: {{ item.quantity }} × ₦{{ item.price }}</small>
+                        </div>
+                    </div>
+                    <span style="font-weight: 600;">₦{{ item.get_total_item_price }}</span>
+                </div>
+                {% empty %}
+                <p style="font-size: 0.8rem; color: #999;">No items found for this order.</p>
+                {% endfor %}
+            </div>
+
+            <hr style="border: none; border-top: 1px solid #ddd; margin: 10px 0;">
+
+            <div style="font-size: 0.85rem; color: #666; margin-bottom: 10px;">
+                {% if order.amount > 10500 %}
+                    {% with fee=500 %}
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                        <span>Subtotal</span>
+                        <span style="font-weight: 600;">₦{{ order.amount|add:"-500"|floatformat:2 }}</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                        <span>Delivery Fee (Tier 3)</span>
+                        <span style="font-weight: 600;">₦500.00</span>
+                    </div>
+                    {% endwith %}
+                {% elif order.amount > 2800 %}
+                    {% with fee=300 %}
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                        <span>Subtotal</span>
+                        <span>₦{{ order.amount|add:"-300"|floatformat:2|intcomma }}</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                        <span>Delivery Fee (Tier 2)</span>
+                        <span>₦300.00</span>
+                    </div>
+                    {% endwith %}
+                {% else %}
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                        <span>Subtotal</span>
+                        <span>₦{{ order.amount|add:"-200"|floatformat:2|intcomma }}</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                        <span>Delivery Fee</span>
+                        <span>₦200.00</span>
+                    </div>
+                {% endif %}
+                <p style="font-size: 0.75rem; color: #999; margin: 0;">
+                    Recipient: {{ order.user.username }} <br>
+                    From: Covenant University Campus Store.
+                </p>
+            </div>
+            
+            <div style="display: flex; justify-content: space-between; font-weight: bold;">
+                <span>Total Paid</span>
+                <span>₦{{ order.amount|floatformat:2|intcomma }}</span>
+            </div>
+        </div>
+
+        <div style="display: block; text-align: center; margin-top: 20px;">
+            <button onclick="downloadReceipt()" style="background: #4CAF50; border: none; padding: 10px 20px; border-radius: 10px; cursor: pointer; color: #fff; font-weight: 500; margin-left: 10px;">
+                <i class='bx bxs-download'></i> Download Receipt
+            </button>
+            <a href="{% url 'orders' %}" style="display: block; text-align: center; margin-top: 20px; text-decoration: none; color: #4CAF50; font-weight: 600;"><i class='bx bx-arrow-back'></i> Back to My Orders</a>
+        </div>
+    </div>
+
+    <script>
+        function downloadReceipt() {
+            // This triggers the system print dialog. 
+            // Most modern phones/computers default to "Save as PDF"
+            window.print();
+        }
+    </script>
+</body>
+</html>

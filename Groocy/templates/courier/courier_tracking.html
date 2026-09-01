@@ -1,0 +1,266 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Courier Mission - #{{ order.ref|upper }}</title>
+    <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
+    <link rel="stylesheet" href="{% static 'css/courier_track.css' %}">
+    <link rel="shortcut icon" href="{% static 'images/groocy-head-logo.png' %}" type="image/x-icon">
+</head>
+<body>
+    {% csrf_token %}
+    <div class="tracking-container">
+        <!-- Time & Customer Header -->
+        <div class="top-meta">
+            <div class="timer-box" id="timer-container">
+                <i class='bx bx-time-five'></i>
+                <span id="timer-display">00:00</span>
+            </div>
+            <div class="customer-info">
+                <h4>{{ order.user.get_full_name|default:order.user.username }}</h4>
+                <p><i class='bx bx-phone'></i> {{ order.user.profile.phone_number|default:"No Phone" }}</p>
+                <span style="display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.72rem; font-weight: 700; margin-top: 4px; background: {% if order.payment_method == 'POD' %}#fff3cd{% else %}#e8f5e9{% endif %}; color: {% if order.payment_method == 'POD' %}#856404{% else %}#2e7d32{% endif %};">
+                    Payment: {{ order.payment_method|default:"Online" }}
+                </span>
+            </div>
+        </div>
+
+        <div class="card-main">
+            <!-- New: Order Details Button -->
+            <button class="details-trigger" onclick="toggleDetailsModal()">
+                <i class='bx bx-list-check'></i> View Items to Pack
+            </button>
+
+            <div class="destination-bar">
+                <i class='bx bxs-map-pin'></i>
+                <p>{{ order.address }}</p>
+            </div>
+
+            <!-- Vertical Timeline Section -->
+            <div class="timeline-container">
+                <div class="progress-line">
+                    <div class="progress-fill" id="fill"></div>
+                </div>
+
+                <!-- Stage 1 -->
+                <div class="step-row {% if order.packing_at %}active{% endif %}" id="step-packing">
+                    <div class="indicator"></div>
+                    <div class="step-content">
+                        <h5>Packing</h5>
+                        <small>Verify all items are in bag</small>
+                    </div>
+                    <button class="stage-btn" data-stage="Packing" {% if order.packing_at %}disabled{% endif %}>
+                        {% if order.packing_at %}Done{% else %}Start{% endif %}
+                    </button>
+                </div>
+
+                <!-- Stage 2 -->
+                <div class="step-row {% if order.transit_at %}active{% endif %}">
+                    <div class="indicator"></div>
+                    <div class="step-content">
+                        <h5>In-Transit</h5>
+                        <small>Riding to destination</small>
+                    </div>
+                    <button class="stage-btn" data-stage="Delivering" {% if not order.packing_at or order.transit_at %}disabled{% endif %}>
+                        {% if order.transit_at %}Done{% else %}Start{% endif %}
+                    </button>
+                </div>
+
+                <!-- Stage 3 -->
+                <div class="step-row {% if order.delivered_at %}active{% endif %}">
+                    <div class="indicator"></div>
+                    <div class="step-content">
+                        <h5>Delivered</h5>
+                        <small>Handover to customer</small>
+                    </div>
+                    <button class="stage-btn success" data-stage="Delivered" {% if not order.transit_at or order.delivered_at %}disabled{% endif %}>
+                        Finish
+                    </button>
+                </div>
+            </div>
+
+            <!-- Order Details Modal -->
+            <div id="detailsModal" class="modal-overlay">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>Items to Pack ({{ order.items.count }})</h3>
+                        <i class='bx bx-x' onclick="toggleDetailsModal()" style="cursor: pointer;"></i>
+                    </div>
+                    <div class="order-items">
+                        {% for item in order.items.all %}
+                            <div class="item-preview" style="display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #f0f0f0;">
+                                <div style="display: flex; align-items: center; gap: 12px;">
+                                    {% if item.product_image %}
+                                        <img src="{{ item.product_image }}" alt="{{ item.product_name }}" style="width: 48px; height: 48px; border-radius: 8px; object-fit: cover;">
+                                    {% else %}
+                                        <div style="width: 48px; height: 48px; border-radius: 8px; background: #eee; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; color: #888;">
+                                            <i class='bx bx-package'></i>
+                                        </div>
+                                    {% endif %}
+                                    <div>
+                                        <h3 style="font-size: 0.88rem; margin: 0; color: #222;">{{ item.product_name }}</h3>
+                                        <p style="font-size: 12px; margin: 4px 0; color: #666;">Qty: {{ item.quantity }} x ₦{{ item.price }}</p>
+                                    </div>
+                                </div>
+                                <span style="font-weight: 600; font-size: 0.88rem; color: #333;">₦{{ item.get_total_item_price }}</span>
+                            </div>
+                        {% empty %}
+                            <div style="padding: 20px; text-align: center; color: #777;">
+                                <p>No items found for this order.</p>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Professional Toast -->
+            <div id="successToast" class="success-toast">
+                <div class="toast-content">
+                    <i class='bx bxs-party'></i>
+                    <div>
+                        <h4>Excellent Work!</h4>
+                        <p>Order delivered successfully. Commission added.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="footer-actions">
+                <button class="cancel-link" data-stage="Cancelled" id="cancel-mission-btn">Cancel Mission</button>
+                <div class="total-pill">Total: ₦{{ order.amount }}</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let timeLeft = parseInt("{{ remaining_time }}") || 900;
+        const timerDisplay = document.getElementById('timer-display');
+
+        const countdown = setInterval(() => {
+            if (!timerDisplay) return; // FIX: Prevent error if element missing
+
+            if (timeLeft <= 0) {
+                clearInterval(countdown);
+                timerDisplay.innerText = "Time Expired";
+                timerDisplay.style.color = "red";
+            } else {
+                let minutes = Math.floor(timeLeft / 60);
+                let seconds = timeLeft % 60;
+                
+                // NEW TIME FORMATTING LOGIC
+                if (minutes > 0) {
+                    timerDisplay.innerText = `${minutes} mins ${seconds} sec`;
+                } else {
+                    timerDisplay.innerText = `${seconds} sec`;
+                }
+                timeLeft--;
+            }
+        }, 1000);
+
+        // --- NEW: COURIER LISTENER FOR CUSTOMER CANCELLATIONS ---
+        const pollCancellation = setInterval(async () => {
+            try {
+                const res = await fetch(`/api/order-status/{{ order.ref }}/`);
+                const data = await res.json();
+                
+                if (data.status === 'Cancelled') {
+                    clearInterval(pollCancellation);
+                    clearInterval(countdown);
+                    
+                    // Convert to lowercase to prevent case-matching bugs ('Customer' vs 'customer')
+                    const dynamicCancelledBy = data.cancelled_by ? String(data.cancelled_by).toLowerCase() : '';
+                    let outMessage = "The order was cancelled.";
+
+                    if (dynamicCancelledBy === 'customer') {
+                        outMessage = data.customer_name ? `${data.customer_name} cancelled order` : "The customer cancelled the order.";
+                    } else if (dynamicCancelledBy === 'courier') {
+                        outMessage = "You cancelled this mission.";
+                    }
+                    
+                    window.location.href = `{% url 'payment_error' %}?error=${encodeURIComponent(outMessage)}&user_type=courier`;
+                }
+            } catch (err) {
+                console.error("Error checking customer active status:", err);
+            }
+        }, 4000)
+
+        // Buttons Fix: Attach event listeners to all stage & cancel buttons
+        document.querySelectorAll('.stage-btn').forEach(button => {
+            button.addEventListener('click', function() {
+                const stage = this.getAttribute('data-stage');
+                updateStage(stage, this);
+            });
+        });
+
+
+        function handleTimeout() {
+            timerDisplay.innerText = "TIMEOUT";
+            document.getElementById('timer-container').style.background = "#ff4757";
+            alert("Mission Timed Out. Order is being reassigned.");
+            cancelOrder(); // Trigger the cancel logic
+        }
+
+        function updateStage(stage, btnElement) {
+            // 1. IMMEDIATELY DISABLE to stop double-pay/double-clicks
+            if(btnElement) {
+                btnElement.disabled = true;
+                btnElement.innerHTML = "<i class='bx bx-loader-alt bx-spin'></i>";
+            }
+
+            fetch(`/courier/api/update-stage/{{ order.id }}/`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+                body: JSON.stringify({ stage: stage })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    if (stage === 'Delivered') {
+                        // 2. Show Success Toast
+                        const toast = document.getElementById('successToast');
+                        if(toast) toast.classList.add('show');
+                        
+                        // Delay redirect so they can see the toast
+                        setTimeout(() => {
+                            window.location.href = "{% url 'courier_dashboard' %}";
+                        }, 2500);
+                    } else if (stage === 'Cancelled') {
+                        window.location.href = `{% url 'payment_error' %}?error=${encodeURIComponent(outMessage)}&user_type=courier`;
+                    } else {
+                        location.reload(); // Keep them on page for other stages
+                    }
+                }
+            })
+            .catch(err => {
+                console.error("Error:", err);
+                if(btnElement) btnElement.disabled = false;
+            });
+        }
+
+        function toggleDetailsModal() {
+            const modal = document.getElementById('detailsModal');
+            
+            // 1. Toggle class if CSS uses active class
+            modal.classList.toggle('active');
+            modal.classList.toggle('show');
+
+            // 2. Computed style check safeguard for inline display switching
+            const currentDisplay = window.getComputedStyle(modal).display;
+            if (currentDisplay === 'none') {
+                modal.style.display = 'flex';
+            } else {
+                modal.style.display = 'none';
+            }
+        }
+
+        // Function to cancel order
+        document.getElementById('cancel-mission-btn').addEventListener('click', function() {
+            if(confirm("Cancel this order? No commission will be added.")) {
+                updateStage('Cancelled', this);
+            }
+        });
+
+    </script>
+</body>
+</html>

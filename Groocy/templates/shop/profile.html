@@ -1,0 +1,198 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Profile | Groocy</title>
+    
+    <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
+    <link rel="stylesheet" href="{% static 'css/profile.css' %}">
+    <link rel="shortcut icon" href="{% static 'images/groocy-head-logo.png' %}" type="image/x-icon">
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&family=Sora:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="content">
+        <a href="/home" class="back-link">
+            <i class='bx bx-chevron-left'></i>
+            <span>Back to Home</span>
+        </a> 
+
+        <div class="profile-card">
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }}">
+                        {{ message }} 
+                    </div>
+                {% endfor %}
+            {% endif %}
+            <div class="profile-header">
+                <div class="avatar-circle">
+                    {{ user.username|first|upper }}
+                </div>
+                <div class="profile-titles">
+                    <h3>{{ user.username }}</h3>
+                    <p>{{ user.email }}</p>
+                    <span class="badge-status">Active Student</span>
+                </div>
+            </div>
+
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <svg  xmlns="http://www.w3.org/2000/svg" width="20" height="20"  
+                        fill="#6e6e6e" viewBox="0 0 24 24" >
+                        <!--Boxicons v3.0.8 https://boxicons.com | License  https://docs.boxicons.com/free-->
+                        <path d="M3 20c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V7c0-.16-.05-.31-.11-.44s-1.72-3.45-1.72-3.45A2 2 0 0 0 17.38 2H6.62c-.76 0-1.45.42-1.79 1.11L3.11 6.56c-.07.14-.11.29-.11.45v13Zm2 0V8h14v12zM17.38 4l1 2H5.62l1-2z"></path><path d="M12 13c-1.65 0-3-1.35-3-3H7c0 2.76 2.24 5 5 5s5-2.24 5-5h-2c0 1.65-1.35 3-3 3"></path>
+                    </svg>
+                    <span class="stat-value">{{ orders.count }}</span>
+                    <span class="stat-label">Total Orders</span>
+                </div>
+                <div class="stat-item">
+                    <svg  xmlns="http://www.w3.org/2000/svg" width="20" height="20"  
+                        fill="#6e6e6e" viewBox="0 0 24 24" >
+                        <!--Boxicons v3.0.8 https://boxicons.com | License  https://docs.boxicons.com/free-->
+                        <path d="M20 3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2M4 19V5h16v3h-6c-1.1 0-2 .9-2 2v4c0 1.1.9 2 2 2h6v3zm16-9v4h-6v-4z"></path>
+                    </svg>
+                    <span class="stat-value">₦{{ total_spent|default:"0" }}</span>
+                    <span class="stat-label">Total Spent</span>
+                </div>
+            </div>
+
+            <div class="settings-list">
+                <div class="settings-item" onclick="location.href='{% url 'password_reset' %}';">
+                    <div class="item-left">
+                        <i class='bx bx-lock-alt'></i>
+                        <span>Security & Password</span>
+                    </div>
+                    <i class='bx bx-chevron-right'></i>
+                </div>
+                <div class="settings-item" id="open-edit-profile">
+                    <div class="item-left">
+                        <i class='bx bx-user'></i>
+                        <span>Edit Profile</span>
+                    </div>
+                    <i class='bx bx-chevron-right'></i>
+                </div>
+                <div class="settings-item" id="open-address">
+                    <div class="item-left">
+                        <i class='bx bx-map'></i>
+                        <span>Saved Addresses</span>
+                    </div>
+                    <i class='bx bx-chevron-right'></i>
+                </div>
+                <div class="settings-item logout-text" onclick="location.href='{% url 'logout' %}';">
+                    <div class="item-left">
+                        <i class='bx bx-log-out'></i>
+                        <span>Sign Out</span>
+                    </div>
+                </div>
+                <div class="settings-item delete-text" id="open-delete-account">
+                    <div class="item-left">
+                        <i class='bx bx-trash' style="color: #ff3b30;"></i>
+                        <span style="color: #ff3b30; font-weight: 600;">Delete Account</span>
+                    </div>
+                    <i class='bx bx-chevron-right' style="color: #ff3b30;"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-overlay" class="modal-overlay"></div>
+
+    <div id="edit-profile-modal" class="modal-content">
+        <div class="modal-header">
+            <h3>Edit Profile</h3>
+            <i class='bx bx-x close-modal'></i>
+        </div>
+        <form method="POST" action="{% url 'update_profile' %}">
+            {% csrf_token %}
+            <div class="input-group">
+                <label>Username</label>
+                <input type="text" name="username" value="{{ user.username }}" class="input-field">
+            </div>
+            <div class="input-group">
+                <label>Email Address</label>
+                <input type="email" name="email" value="{{ user.email }}" class="input-field">
+            </div>
+            <button type="submit" class="save-btn">Update Profile</button>
+        </form>
+    </div>
+
+    <div id="saved-address-modal" class="modal-content">
+        <div class="modal-header">
+            <h3>Delivery Address</h3>
+            <i class='bx bx-x close-modal'></i>
+        </div>
+        <form method="POST" action="{% url 'update_profile' %}">
+            {% csrf_token %}
+            <div class="input-group">
+                <label>Current Address</label>
+                <textarea name="address" class="input-field" rows="3" required>{{ user.profile.address|default:"No address saved yet" }}</textarea>
+            </div>
+            <button type="submit" class="save-btn">Update Address</button>
+        </form>
+    </div>
+
+    <div id="delete-account-modal" class="modal-content" style="background: #ffffff; width: 90%; max-width: 440px; border-radius: 16px; padding: 24px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04); font-family: system-ui, -apple-system, sans-serif;">
+        <div class="modal-header" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <div style="display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 50%; background-color: #fee2e2; color: #dc2626;">
+                    <i class='bx bx-error-alt' style="font-size: 20px;"></i>
+                </div>
+                <h3 style="margin: 0; font-size: 18px; font-weight: 600; color: #111827;">Delete Account</h3>
+            </div>
+            <i class='bx bx-x close-modal' style="font-size: 24px; color: #9ca3af; cursor: pointer; transition: color 0.2s;"></i>
+        </div>
+        <div style="margin-bottom: 24px; font-size: 14px; line-height: 1.6; color: #4b5563; text-align: center;">
+            <p style="margin: 0;">Are you sure you want to delete your Groocy account? This action is permanent. All your order history and profile details will be deleted from our systems.</p>
+        </div>
+        <form method="POST" action="{% url 'delete_account' %}">
+            {% csrf_token %}
+            <div class="modal-actions" style="display: flex; gap: 12px;">
+                <button type="button" class="save-btn close-modal" style="flex: 1; padding: 10px 16px; border-radius: 8px; border: 1px solid #d1d5db; background-color: #ffffff; color: #374151; font-size: 14px; font-weight: 500; cursor: pointer; transition: background-color 0.2s;">Cancel</button>
+                <button type="submit" class="save-btn" style="flex: 1; padding: 10px 16px; border-radius: 8px; border: none; background-color: #dc2626; color: #ffffff; font-size: 14px; font-weight: 500; cursor: pointer; transition: background-color 0.2s; white-space: none;">Yes, Delete Account</button>
+            </div>
+        </form>
+    </div>
+
+
+    <script>
+        const overlay = document.getElementById('modal-overlay');
+        const editModal = document.getElementById('edit-profile-modal');
+        const addressModal = document.getElementById('saved-address-modal');
+        const deleteModal = document.getElementById('delete-account-modal');
+
+        // Open Edit Profile
+        document.getElementById('open-edit-profile').onclick = () => {
+            overlay.style.display = 'block';
+            editModal.style.display = 'block';
+        };
+
+        // Open Address
+        document.getElementById('open-address').onclick = () => {
+            overlay.style.display = 'block';
+            addressModal.style.display = 'block';
+        };
+
+        // Open Delete Account Confirmation
+        document.getElementById('open-delete-account').onclick = () => {
+            overlay.style.display = 'block';
+            deleteModal.style.display = 'block';
+        };
+
+        // Close All Modals
+        document.querySelectorAll('.close-modal, .modal-overlay').forEach(el => {
+            el.onclick = (e) => {
+                e.preventDefault();
+                overlay.style.display = 'none';
+                editModal.style.display = 'none';
+                addressModal.style.display = 'none';
+                deleteModal.style.display = 'none';
+            };
+        });
+    </script>
+</body>
+</html>

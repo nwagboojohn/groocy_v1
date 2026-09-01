@@ -1,0 +1,193 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Groocy Admin</title>
+    <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+    
+    <link rel="shortcut icon" href="{% static 'images/groocy-head-logo.png' %}" type="image/x-icon">
+
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&family=Sora:wght@400;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root { --primary: #4CAF50; --bg: #f4f7f6; --dark: #2c3e50; --white: #fff; --shadow: 0 4px 12px rgba(0, 0, 0, 0.08); }
+        body { font-family: 'Poppins', sans-serif; margin: 0; background: var(--bg); display: flex; min-height: 100vh; }
+        
+        /* Sidebar */
+        .sidebar { width: 260px; background: var(--dark); color: white; padding: 25px; position: fixed; height: 100vh; box-sizing: border-box; transition: 0.3s; }
+        .sidebar h2 { color: var(--primary); font-family: 'Sora'; margin-bottom: 40px; }
+        .sidebar a { display: flex; align-items: center; gap: 12px; color: #adb5bd; text-decoration: none; padding: 14px; border-radius: 10px; margin-bottom: 8px; transition: 0.3s; }
+        .sidebar a:hover, .sidebar a.active { background: var(--primary); color: white; box-shadow: 0 4px 10px rgba(76, 175, 80, 0.3); }
+        
+        /* Content */
+        .main-content { margin-left: 260px; padding: 35px; width: calc(100% - 260px); box-sizing: border-box; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; background: var(--white); padding: 15px 25px; border-radius: 15px; box-shadow: var(--shadow); }
+        .card { background: var(--white); padding: 25px; border-radius: 15px; box-shadow: var(--shadow); margin-bottom: 25px; }
+        
+        /* Shared UI Elements */
+        .btn-primary { background: var(--primary); color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: 600; }
+        .input-field { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; margin-bottom: 15px; }
+        .badge { padding: 5px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; }
+        
+        /* Animation for Slide-up Profile */
+        #profilePanel { position: fixed; bottom: -100%; left: 0; width: 100%; height: 75vh; background: white; z-index: 2000; transition: 0.6s cubic-bezier(0.19, 1, 0.22, 1); border-radius: 30px 30px 0 0; box-shadow: 0 -10px 40px rgba(0,0,0,0.15); padding: 40px; }
+        #profilePanel.active { bottom: 0; }
+
+        @media (max-width: 555px){
+            .sidebar { 
+                width: 260px; 
+                background: var(--dark); 
+                color: white; 
+                padding: 25px; 
+                position: fixed; 
+                left: -500px;
+                height: 100vh; 
+                box-sizing: border-box; 
+                transition: 0.3s; 
+            }
+            .main-content { 
+                width: 100%;
+                margin-left: 0px; 
+                padding: 30px 5%; 
+            }
+            .header { 
+                width: 100%;
+                display: flex; 
+                gap: 20px; 
+                margin-bottom: 25px; 
+                padding: 12px 20px; 
+                border-radius: 12px; 
+                background: var(--white);
+                box-shadow: var(--shadow); 
+            }
+            .header h1{
+                font-size: 20px;
+            }
+            .header span{
+                font-size: 18px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="sidebar-overlay" onclick="toggleSidebar()"></div>
+    
+    <div class="sidebar" id="sidebar">
+        <h2>Groocy</h2>
+        <a href="{% url 'admin_dashboard' %}" class="{% if request.resolver_match.url_name == 'admin_dashboard' %}active{% endif %}"><i class='bx bxs-dashboard'></i> Dashboard</a>
+        <a href="{% url 'admin_products' %}" class="{% if request.resolver_match.url_name == 'admin_products' %}active{% endif %}"><i class='bx bxs-store'></i> Products</a>
+        <a href="{% url 'admin_customers' %}" class="{% if request.resolver_match.url_name == 'admin_customers' %}active{% endif %}"><i class='bx bxs-group'></i> Customers</a>
+        <a href="{% url 'admin_couriers' %}" class="{% if request.resolver_match.url_name == 'admin_couriers' %}active{% endif %}"><i class="bx bx-run"></i> Couriers</a>
+        <a href="{% url 'admin_orders' %}" class="{% if request.resolver_match.url_name == 'admin_orders' %}active{% endif %}" style="display: flex; align-items: center; justify-content: space-between;">
+            <span><i class='bx bxs-cart-alt' style="margin-right: 7px;"></i> Orders</span>
+            <span class="new-order-badge-sidebar" style="display:none; background: #007bff; color: white; padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: bold;">NEW</span>
+        </a>
+        <hr style="margin: 30px 0; border: 1px solid #556b80;">
+        <a href="{% url 'home' %}" style="border-radius: 10px; padding-top: 20px;">
+            <i class='bx bx-chevron-left'></i> Back to Home
+        </a>
+    </div>
+
+    <div class="main-content">
+        <header class="header">
+            <div style="display: flex; align-items: center; gap: 15px;">
+                <i class='bx bx-menu menu-toggle' onclick="toggleSidebar()"></i>
+                <h1 style="font-size: 1.3rem; margin: 0;">{% block page_title %}{% endblock %}</h1>
+            </div>
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <span class="admin-name">Admin: <b>{{ user.username }}</b></span>
+                <img src="https://ui-avatars.com/api/?name={{ user.username }}&background=4CAF50&color=fff" style="width: 35px; border-radius: 50%;">
+            </div>
+        </header>
+        {% block content %}{% endblock %}
+    </div>
+
+    <audio id="orderAlarm" src="{% static 'audio/order_alert.mp3' %}" preload="auto"></audio>
+
+    <script>
+        // 1. Sidebar Toggle Logic
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('active');
+            document.querySelector('.sidebar-overlay').classList.toggle('active');
+        }
+        function closeProfile() { document.getElementById('profilePanel').classList.remove('active'); }
+
+        // 2. Optimized Notification Logic
+        const alarm = document.getElementById('orderAlarm');
+        let audioUnlocked = false;
+        // We use ONE consistent key for memory
+        let lastKnownCount = parseInt(localStorage.getItem('groocyOrderCount')) || 0;
+
+        // UNLOCK AUDIO: Must happen on first click
+        document.addEventListener('click', () => {
+            if (!audioUnlocked) {
+                alarm.play().then(() => {
+                    alarm.pause();
+                    alarm.currentTime = 0;
+                    audioUnlocked = true;
+                    console.log("🔊 Audio System Online");
+                }).catch(e => console.error("Audio block:", e));
+            }
+        }, { once: true });
+
+        function checkNewOrders() {
+            fetch("{% url 'admin_order_count' %}")
+                .then(res => res.json())
+                .then(data => {
+                    const currentCount = data.count;
+                    // If the new count is higher than what we last saw...
+                    if (currentCount > lastKnownCount) {
+                        
+                        // A. Play the Shopify Bell Multiple times
+                        if (audioUnlocked) {
+                            let rings = 0;
+                            const ringInterval = setInterval(() => {
+                                alarm.currentTime = 0;
+                                alarm.play();
+                                rings++;
+                                if (rings >= diff) clearInterval(ringInterval);
+                            }, 1000); // Rings every 1 second for each new order
+                        }
+
+                        // B. Show Sidebar Badge (Blue - Gmail style)
+                        const sidebarBadge = document.querySelector('.new-order-badge-sidebar');
+                        if (sidebarBadge) sidebarBadge.style.display = 'inline-block';
+
+                        // C. Show Row Badges (Green - Order Table)
+                        const rowBadges = document.querySelectorAll('.new-order-badge-row');
+                        rowBadges.forEach(b => b.style.display = 'inline-block');
+
+                        // D. Update memory so we don't alarm again for the same order
+                        lastKnownCount = currentCount;
+                        localStorage.setItem('groocyOrderCount', currentCount);
+
+                        // 4. Refresh page after a short delay so the "is_new" 
+                        // badges show up in the table automatically
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 2000);
+
+                        // E. 10-Minute Expiry for badges
+                        setTimeout(() => {
+                            if (sidebarBadge) sidebarBadge.style.display = 'none';
+                            rowBadges.forEach(b => b.style.display = 'none');
+                        }, 600000);
+                    } 
+                });
+        }
+
+        // Run every 20 seconds
+        setInterval(checkNewOrders, 20000);
+        
+        // Run once on load to sync the count
+        checkNewOrders();
+    </script>
+</body>
+
+</html>
+
+

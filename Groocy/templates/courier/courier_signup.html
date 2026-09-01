@@ -1,0 +1,106 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Courier Signup Page</title>
+    <meta name="author" content="Groocy">
+    <meta name="description" content="Groocy is your go-to app for fast delivery, groceries, and essentials.">
+    <link href='https://cdn.boxicons.com/fonts/basic/boxicons.min.css' rel='stylesheet'>
+    <link href='https://cdn.boxicons.com/fonts/brands/boxicons-brands.min.css' rel='stylesheet'>
+    <link rel="stylesheet" href="{% static 'css/signup_login.css' %}">
+    <link rel="shortcut icon" href="{% static 'images/groocy-head-logo.png' %}" type="image/x-icon">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"/>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@100..800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Code+Latin:wght@100..700&family=Quicksand:wght@300..700&family=Sora:wght@100..800&display=swap" rel="stylesheet">
+</head>
+
+<style>
+    .auth-container{
+        height: 150vh;
+    }
+</style>
+
+<body>
+    <!-- sign up section -->
+    <section class="auth-container sign-up">
+        <img class="logo" src="{% static 'images/groocy-logo.png' %}" alt="Groocy">
+        <h2>Register and start Earning!</h2>
+        
+        {% if form.errors %}
+            <div class="error-msg" style="color: red; font-size: 14px; margin-bottom: 10px;">
+                {{ form.non_field_errors }}
+                {% for field in form %}{{ field.errors }}{% endfor %}
+            </div>
+        {% endif %}
+
+        <form method="POST" class="form-detail">
+            {% csrf_token %}
+            <label>Username</label>
+            <input type="text" name="username" class="input-field" value="{{ form.username.value|default:'' }}" required>
+            
+            <label>Email</label>
+            <input type="email" name="email" class="input-field" value="{{ form.email.value|default:'' }}" required>
+
+            <label>Primary Delivery Hall</label>
+            <select name="location_1" class="custom-select" required>
+                <option value="John Hall">John Hall</option>
+                <option value="Paul Hall">Paul Hall</option>
+                <option value="Mary Hall">Mary Hall</option>
+                <option value="Lydia Hall">Lydia Hall</option>
+            </select>
+
+            <label>Secondary Hall (Optional)</label>
+            <select name="location_2" class="custom-select">
+                <option value="">None</option>
+                <option value="John Hall">John Hall</option>
+                <option value="Paul Hall">Paul Hall</option>
+                <option value="Mary Hall">Mary Hall</option>
+                <option value="Lydia Hall">Lydia Hall</option>
+            </select>
+            <p style="font-size: 14px; color: #656565;">You can deliver to a maximum of 2 halls.</p>
+
+            <div class="text-field">
+                <label>Password</label>
+                <div class="password-fill">
+                    <input type="password" name="password" id="pass" class="input-field" required>
+                    <p class="display-password">Show</p>
+                </div>
+            </div>
+
+            <div class="text-field">
+                <label>Confirm Password</label>
+                <div class="password-fill">
+                    <input type="password" name="confirm_password" id="confirm_pass" class="input-field" required>
+                    <p class="display-password">Show</p>
+                </div>
+            </div>
+
+            <button type="submit" class="submit-btn">Signup</button>
+        </form>
+        <p class="navigation-link">Registered rider? <a href="{% url 'courier_login' %}">Login</a></p>
+    </section>
+
+    <!-- - JavaScript for password toggle  -->
+    <script>
+        document.querySelectorAll('.display-password').forEach(button => {
+            button.addEventListener('click', function() {
+                const passwordInput = this.previousElementSibling;
+                
+                if (passwordInput.type === 'password') {
+                    passwordInput.type = 'text';
+                    this.textContent = 'Hide';
+                } else {
+                    passwordInput.type = 'password';
+                    this.textContent = 'Show';
+                }
+            });
+        });
+
+    </script>
+</body>
+</html>

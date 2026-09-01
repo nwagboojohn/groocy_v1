@@ -1,0 +1,138 @@
+{% extends 'admin/base_admin.html' %}
+{% load static %}
+{% block page_title %}Customer LeaderBoard{% endblock %}
+{% block content %}
+
+<style>
+    :root {
+        --gold-bg: #FFF9E6; --gold-border: #FFD700; --gold-text: #856404;
+        --silver-bg: #F8F9FA; --silver-border: #C0C0C0; --silver-text: #383d41;
+        --bronze-bg: #FFF5F0; --bronze-border: #CD7F32; --bronze-text: #721c24;
+    }
+
+    /* Table Styling */
+    .leaderboard-table { width: 100%; border-collapse: separate; border-spacing: 0 8px; margin-top: 20px; }
+    .leaderboard-table th { padding: 15px; color: #777; font-weight: 600; text-align: left; font-size: 0.9rem; }
+    .leaderboard-table td { padding: 15px; background: white; transition: 0.2s; vertical-align: middle; }
+
+    /* Top 3 Row Styling */
+    .row-gold td { background: var(--gold-bg) !important; border-top: 1px solid var(--gold-border); border-bottom: 3px solid var(--gold-border); }
+    .row-gold td:first-child { border-left: 1px solid var(--gold-border); border-radius: 12px 0 0 12px; }
+    .row-gold td:last-child { border-right: 1px solid var(--gold-border); border-radius: 0 12px 12px 0; }
+
+    .row-silver td { background: var(--silver-bg) !important; border-top: 1px solid var(--silver-border); border-bottom: 3px solid var(--silver-border); }
+    .row-silver td:first-child { border-left: 1px solid var(--silver-border); border-radius: 12px 0 0 12px; }
+    .row-silver td:last-child { border-right: 2px solid var(--silver-border); border-radius: 0 12px 12px 0; }
+
+    .row-bronze td { background: var(--bronze-bg) !important; border-top: 1px solid var(--bronze-border); border-bottom: 3px solid var(--bronze-border); }
+    .row-bronze td:first-child { border-left: 1px solid var(--bronze-border); border-radius: 12px 0 0 12px; }
+    .row-bronze td:last-child { border-right: 1px solid var(--bronze-border); border-radius: 0 12px 12px 0; }
+
+    /* Regular Row Hover */
+    .customer-row:not(.row-gold):not(.row-silver):not(.row-bronze):hover td { background: #f9f9f9; cursor: default; }
+
+    /* Avatar Circle */
+    .avatar-circle {
+        width: 45px; height: 45px; border-radius: 50%; display: flex; 
+        align-items: center; justify-content: center; font-weight: bold; 
+        color: white; font-size: 1.2rem; position: relative;
+    }
+    .badge-medal { position: absolute; top: -10px; right: -10px; font-size: 1.2rem; }
+
+    /* Search Bar */
+    .search-container { position: relative; max-width: 600px; margin-bottom: 30px; display: flex; gap: 10px; }
+    .search-input { 
+        flex-grow: 1; padding: 12px 15px 12px 45px; border-radius: 10px; 
+        border: 1px solid #ddd; outline: none; font-family: inherit; 
+    }
+</style>
+
+<div class="search-container">
+    <i class='bx bx-search' style="position: absolute; left: 15px; top: 15px; color: #888; font-size: 1.2rem;"></i>
+    <input type="text" id="customerSearch" class="search-input" placeholder="Search by name or email...">
+    <button onclick="filterCustomers()" class="btn-primary" style="border: none;">Search</button>
+</div>
+
+<div id="noUserMsg" style="display: none; color: #e53935; padding: 10px; margin-bottom: 10px; font-weight: 500;">
+    <i class='bx bx-info-circle'></i> No user found with that name.
+</div>
+
+<div class="card" style="padding: 10px 20px;">
+    <table class="leaderboard-table">
+        <thead>
+            <tr>
+                <th>Customer</th>
+                <th>Total Orders</th>
+                <th>Total Spent</th>
+                <th>Date Joined</th>
+                <th>Last Active</th>
+                <th>Rank</th>
+            </tr>
+        </thead>
+        <tbody id="customerTableBody">
+            {% for c in customers %}
+            <tr class="customer-row 
+                {% if forloop.counter == 1 %}row-gold{% elif forloop.counter == 2 %}row-silver{% elif forloop.counter == 3 %}row-bronze{% endif %}"
+                data-search="{{ c.username|lower }} {{ c.email|lower }}">
+                
+                <td>
+                    <div style="display: flex; align-items: center; gap: 15px;">
+                        <div class="avatar-circle" style="background: 
+                            {% if forloop.counter == 1 %}#FFD700{% elif forloop.counter == 2 %}#A9A9A9{% elif forloop.counter == 3 %}#CD7F32{% else %}#4CAF50{% endif %};">
+                            {{ c.username|slice:":1"|upper }}
+                            {% if forloop.counter == 1 %}<span class="badge-medal">🥇</span>
+                            {% elif forloop.counter == 2 %}<span class="badge-medal">🥈</span>
+                            {% elif forloop.counter == 3 %}<span class="badge-medal">🥉</span>{% endif %}
+                        </div>
+                        <div>
+                            <div style="font-weight: 800; color: #333;">{{ c.username }}</div>
+                            <div style="font-size: 0.8rem; color: #888;">{{ c.email }}</div>
+                        </div>
+                    </div>
+                </td>
+
+                <td style="font-weight: 600;">{{ c.order_count }} {% if c.order_count == 1 %} Order {% else %} Orders {% endif %} </td>
+
+                <td style="font-weight: 700; color: #2e7d32;">₦{{ c.total_spent|default:0 }}</td>
+
+                <td style="color: #666; font-size: 0.9rem;">{{ c.date_joined|date:"M d, Y" }}</td>
+
+                <td style="color: #666; font-size: 0.9rem;">{{ c.last_login|date:"M d Y, g:i a"|default:"Never" }}</td>
+
+                <td style="font-weight: 800; color: #888; padding-left: 20px;">
+                    #{{ forloop.counter }}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<script>
+    function filterCustomers() {
+        const input = document.getElementById('customerSearch').value.toLowerCase();
+        const rows = document.querySelectorAll('.customer-row');
+        const noUserMsg = document.getElementById('noUserMsg');
+        let found = false;
+
+        rows.forEach(row => {
+            const searchText = row.getAttribute('data-search');
+            if (searchText.includes(input)) {
+                row.style.display = "";
+                found = true;
+            } else {
+                row.style.display = "none";
+            }
+        });
+
+        noUserMsg.style.display = found ? "none" : "block";
+    }
+
+    // Allow search on "Enter" key
+    document.getElementById('customerSearch').addEventListener('keypress', function (e) {
+        if (e.key === 'Enter') {
+            filterCustomers();
+        }
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,795 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Courier Dashboard</title>
+    
+    <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
+    <link rel="stylesheet" href="{% static 'css/courier_dash.css' %}">
+    <link rel="shortcut icon" href="{% static 'images/groocy-head-logo.png' %}" type="image/x-icon">
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&family=Sora:wght@400;600;700&display=swap" rel="stylesheet">
+</head>
+<style>
+    /* New badge styling */
+    .new-badge {
+        background: #e8f5e9;
+        color: #4CAF50;
+        font-size: 0.7rem;
+        padding: 2px 8px;
+        border-radius: 12px;
+        font-weight: 600;
+        display: inline-block;
+        margin-bottom: 5px;
+        animation: pulse 1.5s infinite;
+    }
+    @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
+
+    /* ==========================================================================
+       PROFESSIONAL COURIER SETTINGS & MODAL STYLING
+       ========================================================================== */
+    .side-modal {
+        background: #ffffff;
+        box-shadow: -5px 0 25px rgba(0,0,0,0.08);
+        padding: 24px;
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+    }
+    
+    .settings-form {
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+        height: 100%;
+        overflow-y: auto;
+        padding-bottom: 20px;
+    }
+
+    .form-group {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+
+    .form-group label {
+        font-family: 'Poppins', sans-serif;
+        font-size: 0.85rem;
+        font-weight: 500;
+        color: #64748b;
+    }
+
+    .fin-input {
+        width: 100%;
+        padding: 12px 14px;
+        border: 1.5px solid #e2e8f0;
+        border-radius: 10px;
+        font-family: 'Poppins', sans-serif;
+        font-size: 0.9rem;
+        color: #1e293b;
+        background-color: #f8fafc;
+        transition: all 0.3s ease;
+    }
+
+    .fin-input:focus {
+        outline: none;
+        border-color: #4CAF50;
+        background-color: #ffffff;
+        box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.1);
+    }
+
+    .save-btn {
+        width: 100%;
+        background: #4CAF50;
+        color: white;
+        border: none;
+        padding: 14px;
+        border-radius: 10px;
+        font-family: 'Sora', sans-serif;
+        font-weight: 600;
+        font-size: 0.95rem;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        margin-top: 5px;
+        box-shadow: 0 4px 12px rgba(76, 175, 80, 0.2);
+    }
+
+    .save-btn:hover {
+        background: #43a047;
+        transform: translateY(-1px);
+    }
+
+    .security-section {
+        border-top: 1px solid #f1f5f9;
+        padding-top: 15px;
+        margin-top: 10px;
+    }
+
+    .section-label {
+        font-family: 'Sora', sans-serif;
+        font-size: 0.8rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        color: #94a3b8;
+        letter-spacing: 0.5px;
+        margin-bottom: 8px;
+    }
+
+    .reset-link {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 12px 14px;
+        background: #f8fafc;
+        border-radius: 10px;
+        text-decoration: none;
+        color: #334155;
+        font-family: 'Poppins', sans-serif;
+        font-size: 0.9rem;
+        font-weight: 500;
+        transition: all 0.2s ease;
+        margin-bottom: 8px;
+        border: 1px solid #f1f5f9;
+    }
+
+    .reset-link:hover {
+        background: #f1f5f9;
+        color: #0f172a;
+    }
+
+    .reset-link i {
+        font-size: 1.2rem;
+        color: #64748b;
+    }
+
+    /* Danger Zone / Delete Section */
+    .danger-section {
+        border-top: 1px solid #fee2e2;
+        padding-top: 15px;
+        margin-top: 10px;
+    }
+
+    .danger-label {
+        font-family: 'Sora', sans-serif;
+        font-size: 0.8rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        color: #ef4444;
+        letter-spacing: 0.5px;
+        margin-bottom: 8px;
+    }
+
+    .delete-btn-trigger {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        width: 100%;
+        padding: 12px 14px;
+        background: #fff5f5;
+        border: 1px solid #fee2e2;
+        border-radius: 10px;
+        color: #dc2626;
+        font-family: 'Poppins', sans-serif;
+        font-size: 0.9rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .delete-btn-trigger:hover {
+        background: #fee2e2;
+    }
+
+    /* Popup Confirmation Modal overlay */
+    .confirm-modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(15, 23, 42, 0.6);
+        backdrop-filter: blur(4px);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 2000;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.3s ease;
+    }
+
+    .confirm-modal-overlay.show {
+        opacity: 1;
+        pointer-events: auto;
+    }
+
+    .confirm-modal-box {
+        background: #ffffff;
+        padding: 28px;
+        border-radius: 16px;
+        max-width: 400px;
+        width: 90%;
+        text-align: center;
+        box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04);
+        transform: scale(0.9);
+        transition: transform 0.3s ease;
+    }
+
+    .confirm-modal-overlay.show .confirm-modal-box {
+        transform: scale(1);
+    }
+
+    .confirm-modal-box i.warning-icon {
+        font-size: 3.5rem;
+        color: #ef4444;
+        background: #fee2e2;
+        padding: 12px;
+        border-radius: 50%;
+        margin-bottom: 16px;
+        display: inline-block;
+    }
+
+    .confirm-modal-box h4 {
+        font-family: 'Sora', sans-serif;
+        font-size: 1.25rem;
+        color: #0f172a;
+        margin-bottom: 8px;
+    }
+
+    .confirm-modal-box p {
+        font-family: 'Poppins', sans-serif;
+        font-size: 0.9rem;
+        color: #64748b;
+        line-height: 1.5;
+        margin-bottom: 24px;
+    }
+
+    .modal-actions-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+    }
+
+    .modal-btn {
+        padding: 12px;
+        border-radius: 8px;
+        font-family: 'Poppins', sans-serif;
+        font-weight: 600;
+        font-size: 0.9rem;
+        cursor: pointer;
+        border: none;
+        transition: background 0.2s ease;
+    }
+
+    .modal-btn.cancel {
+        background: #f1f5f9;
+        color: #475569;
+    }
+
+    .modal-btn.cancel:hover {
+        background: #e2e8f0;
+    }
+
+    .modal-btn.confirm-delete {
+        background: #ef4444;
+        color: white;
+    }
+
+    .modal-btn.confirm-delete:hover {
+        background: #dc2626;
+    }
+</style>
+<body>
+    {% csrf_token %}
+
+    <!-- Base64 short notification beep -->
+    <audio id="orderAlarm" src="audio/order_alert.mp3" preload="auto"></audio>
+
+    <div class="fintech-dashboard">
+        <nav class="dash-nav">
+            <div class="user-meta">
+                <!-- Added id="nav-avatar" here to resolve UI JS errors -->
+                <div class="avatar-circle" id="nav-avatar">{{ request.user.username|slice:":1"|upper }}</div>
+                <div>
+                    <!-- Added id="nav-username" here to resolve UI JS errors -->
+                    <span class="user-name" id="nav-username">{{ request.user.username }}</span>
+                    <small class="status-pill {% if profile.is_available %}available{% else %}offline{% endif %}">
+                        ● {% if profile.is_available %}Active{% else %}Offline{% endif %}
+                    </small>
+                </div>
+            </div>
+
+            <div class="nav-right">
+                <!-- Order History Trigger -->
+                <button class="btn-history" onclick="toggleHistory()">
+                    <i class='bx bx-history'></i> History
+                </button>
+
+                <!-- Modern Availability Toggle -->
+                <label class="toggle-switch">
+                    <input type="checkbox" id="availability-toggle" {% if profile.is_available %}checked{% endif %} onchange="toggleStatus()">
+                    <span class="slider-round"></span>
+                </label>
+
+                <!-- Settings Icon -->
+                <div class="nav-actions" onclick="toggleProfile()">
+                    <i class='bx bx-cog'></i>
+                </div>
+            </div>
+        </nav>
+
+        <div class="stats-grid">
+            <div class="stat-card balance-card">
+                <div class="card-header"><small>Available Earnings</small><i class='bx bx-wallet'></i></div>
+                <h2>₦{{ profile.balance|default:"0.00" }}</h2>
+            </div>
+            <div class="stat-card zone-card" onclick="toggleProfile()">
+                <div class="card-header"><small>Active Zones</small><i class='bx bx-map-pin'></i></div>
+                <p id="display-locs" class="zone-text">{{ profile.location_1 }} & {{ profile.location_2|default:"None" }}</p>
+            </div>
+        </div>
+
+        <div class="order-section">
+            <div class="section-header">
+                <h3>Delivery Requests</h3>
+                <span class="badge" id="order-count">{{ orders|length }}</span>
+            </div>
+            
+            <div id="order-list">
+                {% for order in orders %}
+                <div class="fin-card order-request" id="order-{{ order.id }}" data-timeleft="120">
+                    <div class="card-left">
+                        <div class="icon-box"><i class='bx bx-package'></i></div>
+                        <div class="card-details">
+                            <span class="new-badge">New Order</span>
+                            <p class="h-name">{{ order.address|truncatechars:20 }}</p>
+                            <p class="o-ref">Ref: <span>#{{ order.ref|upper }}</span></p>
+                        </div>
+                    </div>
+                    <div class="action-wrap">
+                        <small class="expiry-timer">120s</small>
+                        <button class="accept-btn" onclick="acceptOrder('{{order.id}}', '{{ order.ref }}')">Accept</button>
+                    </div>
+                </div>
+                {% empty %}
+                <div class="empty-state">
+                    <i class='bx bx-radar'></i>
+                    <p>Scanning for orders in your zones...</p>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Sliding History Panel -->
+        <div id="history-panel" class="history-panel">
+            <div class="modal-header">
+                <h4>Order History</h4>
+                <div class="close-btn" onclick="toggleHistory()"><i class='bx bx-x'></i></div>
+            </div>
+
+            <div class="history-search-wrapper">
+                <i class='bx bx-search search-icon'></i>
+                <input type="text" id="history-search" placeholder="Search customer name or reference..." oninput="filterHistory()">
+            </div>
+
+            <div class="history-list" id="history-list-container">
+                {% for past_order in history %}
+                <div class="history-item {% if past_order.status == 'Cancelled' %}cancelled-item{% endif %}" data-customer="{{ past_order.user.username|lower }}" data-ref="{{ past_order.ref|lower }}">
+                    <div class="h-main-info">
+                        <div class="h-left-col">
+                            <div class="h-icon-frame">
+                                {% if past_order.status == 'Delivered' %}
+                                    <i class='bx bx-check-shield status-icon delivered'></i>
+                                {% else %}
+                                    <i class='bx bx-x-circle status-icon cancelled'></i>
+                                {% endif %}
+                            </div>
+                            <div class="h-details">
+                                <div class="h-cust-row">
+                                    <p class="h-cust">{{ past_order.user.username }}</p>
+                                    <span class="history-badge {% if past_order.status == 'Delivered' %}badge-delivered{% else %}badge-cancelled{% endif %}">
+                                        {{ past_order.status }}
+                                    </span>
+                                </div>
+                                <div class="h-timestamp">
+                                    <span class="h-date"><i class='bx bx-calendar-alt'></i> 
+                                        {% if past_order.delivered_at %}{{ past_order.delivered_at|date:"M d, Y" }}{% else %}{{ past_order.updated_at|date:"M d, Y" }}{% endif %}
+                                    </span>
+                                    <span class="h-time"><i class='bx bx-time-five'></i> 
+                                        {% if past_order.delivered_at %}{{ past_order.delivered_at|date:"g:i A" }}{% else %}{{ past_order.updated_at|date:"g:i A" }}{% endif %}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="h-right-col">
+                            <p class="h-amt">₦{{ past_order.amount }}</p>
+                            <span class="h-ref">#{{ past_order.ref|upper }}</span>
+                        </div>
+                    </div>
+                </div>
+                {% empty %}
+                <div class="history-empty-state" id="history-base-empty">
+                    <i class='bx bx-history'></i>
+                    <p>No completed orders yet.</p>
+                </div>
+                {% endfor %}
+
+                <div class="history-empty-state" id="history-search-empty" style="display: none;">
+                    <i class='bx bx-file-find'></i>
+                    <p>No matching orders found.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Settings Sliding Panel -->
+        <div id="profile-panel" class="side-modal">
+            <div class="modal-header">
+                <h4>Profile Settings</h4>
+                <div class="close-btn" onclick="toggleProfile()"><i class='bx bx-x'></i></div>
+            </div>
+            
+            <form id="update-form" class="settings-form">
+                <div class="form-group">
+                    <label>Username</label>
+                    <input type="text" id="username" value="{{ request.user.username }}" class="fin-input">
+                </div>
+                
+                <div class="form-group">
+                    <label>Email Address</label>
+                    <input type="email" id="email" value="{{ request.user.email }}" class="fin-input">
+                </div>
+
+                <div class="form-group">
+                    <label>Primary Zone</label>
+                    <select id="loc1" class="fin-input">
+                        <option value="John Hall" {% if profile.location_1 == 'John Hall' %}selected{% endif %}>John Hall</option>
+                        <option value="Paul Hall" {% if profile.location_1 == 'Paul Hall' %}selected{% endif %}>Paul Hall</option>
+                        <option value="Mary Hall" {% if profile.location_1 == 'Mary Hall' %}selected{% endif %}>Mary Hall</option>
+                        <option value="Lydia Hall" {% if profile.location_1 == 'Lydia Hall' %}selected{% endif %}>Lydia Hall</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Secondary Zone (Optional)</label>
+                    <select id="loc2" class="fin-input">
+                        <option value="">None</option>
+                        <option value="John Hall" {% if profile.location_2 == 'John Hall' %}selected{% endif %}>John Hall</option>
+                        <option value="Paul Hall" {% if profile.location_2 == 'Paul Hall' %}selected{% endif %}>Paul Hall</option>
+                        <option value="Mary Hall" {% if profile.location_2 == 'Mary Hall' %}selected{% endif %}>Mary Hall</option>
+                        <option value="Lydia Hall" {% if profile.location_2 == 'Lydia Hall' %}selected{% endif %}>Lydia Hall</option>
+                    </select>
+                </div>
+
+                <button type="button" onclick="saveProfile()" class="save-btn">Save Changes</button>
+                
+                <div class="security-section">
+                    <p class="section-label">Security</p>
+                    <a href="{% url 'password_reset' %}" class="reset-link">
+                        <span>Change Password</span>
+                        <i class='bx bx-chevron-right'></i>
+                    </a>
+                    <a href="{% url 'courier_logout' %}" class="reset-link">
+                        <span>Logout</span>
+                        <i class='bx bx-log-out'></i>
+                    </a>
+                </div>
+
+                <!-- Delete Account Section Inside Dashboard Side Modal -->
+                <div class="danger-section">
+                    <p class="danger-label">Danger Zone</p>
+                    <button type="button" class="delete-btn-trigger" onclick="openDeleteModal()">
+                        <span>Delete Account</span>
+                        <i class='bx bx-trash'></i>
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Global Toast Element -->
+        <div id="toast" class="toast-msg"><i class='bx bx-check-circle'></i> <span id="toast-text">Success</span></div>
+    </div>
+
+    <!-- Delete Confirmation Modal Markup -->
+    <div id="delete-confirm-modal" class="confirm-modal-overlay">
+        <div class="confirm-modal-box">
+            <i class='bx bx-error-alt warning-icon'></i>
+            <h4>Delete Account</h4>
+            <p>This action cannot be undone. All your profile data, transaction logs, and available balance earnings will be permanently erased.</p>
+            <div class="modal-actions-grid">
+                <button type="button" class="modal-btn cancel" onclick="closeDeleteModal()">Cancel</button>
+                <form action="{% url 'delete_courier_account' %}" method="POST" style="display:inline; width: 100%;">
+                    {% csrf_token %}
+                    <button type="submit" class="modal-btn confirm-delete" style="width: 100%;">Yes, Delete</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Set to keep track of orders already on the screen
+        let displayedOrderIds = new Set();
+        const csrftoken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+        // --- NEW INITIALIZATION BLOCK ---
+        // Run this immediately when the page loads to activate Django's static HTML cards
+        document.addEventListener("DOMContentLoaded", () => {
+            const existingCards = document.querySelectorAll('.order-request');
+            
+            existingCards.forEach(card => {
+                // 1. Extract ID and add to our set so polling doesn't duplicate it
+                const orderId = parseInt(card.id.split('-')[1]);
+                displayedOrderIds.add(orderId);
+
+                // 2. Calculate remaining time (Django 'U' gives seconds, JS uses ms)
+                const createdSeconds = parseInt(card.getAttribute('data-created'));
+                const createdTime = createdSeconds * 1000; 
+                const now = new Date().getTime();
+                
+                // Find elapsed seconds
+                const diff = Math.floor((now - createdTime) / 1000);
+                
+                let timeLeft = 120 - diff;
+                if (timeLeft < 0) timeLeft = 0;
+
+                // 3. Start the live countdown for this pre-loaded card
+                startTimerForCard(card, timeLeft, orderId);
+            });
+        });
+        // --- END NEW BLOCK ---
+
+        // Audio Logic & Offline Guard ---
+        function playAlarm3Times() {
+            const audio = document.getElementById('orderAlarm');
+            let playCount = 0;
+            
+            audio.currentTime = 0; 
+            audio.play().catch(e => console.log('Audio blocked by browser:', e));
+
+            audio.onended = function() {
+                playCount++;
+                if (playCount < 3) {
+                    audio.currentTime = 0;
+                    audio.play();
+                } else {
+                    audio.onended = null; // Clean up listner when done
+                }
+            };
+        }
+
+        function pollForOrders() {
+            // OFFLINE GUARD: If toggle is off, do not poll or play alarms
+            const isOnline = document.getElementById('availability-toggle').checked;
+            if (!isOnline) return; 
+
+            fetch('/courier/api/poll-orders/')
+            .then(res => res.json())
+            .then(data => {
+                const list = document.getElementById('order-list');
+                const emptyState = document.querySelector('.empty-state');
+                let hasNew = false;
+                
+                if(data.orders.length > 0 && emptyState) emptyState.style.display = 'none';
+
+                data.orders.forEach(order => {
+                    if(!displayedOrderIds.has(order.id)) {
+                        displayedOrderIds.add(order.id);
+                        hasNew = true;
+                        
+                        let timeLeft = order.time_left;
+
+                        // If the server says it's already expired, don't even bother rendering it
+                        if(timeLeft <= 0) return;
+
+                        const card = document.createElement('div');
+                        card.className = 'fin-card order-request';
+                        card.id = `order-${order.id}`;
+                        card.innerHTML = `
+                            <div class="card-left">
+                                <div class="icon-box"><i class='bx bx-package'></i></div>
+                                <div class="card-details">
+                                    <span class="new-badge">New Order</span>
+                                    <p class="h-name">${order.address}</p>
+                                    <p class="o-ref">Ref: <span>#${order.ref.toUpperCase()}</span></p>
+                                </div>
+                            </div>
+                            <div class="action-wrap">
+                                <small class="expiry-timer">${timeLeft}s</small>
+                                <button class="accept-btn" onclick="acceptOrder('${order.id}', '${order.ref}')">Accept</button>
+                            </div>
+                        `;
+                        list.prepend(card);
+                        startTimerForCard(card, timeLeft, order.id);
+                    }
+                });
+                
+                if(hasNew) {
+                    playAlarm3Times();
+                    document.getElementById('order-count').innerText = displayedOrderIds.size;
+                }
+            });
+        }
+
+        function startTimerForCard(card, timeLeft, orderId) {
+            const timerLabel = card.querySelector('.expiry-timer');
+            const badge = card.querySelector('.new-badge');
+            
+            const countdown = setInterval(() => {
+                // MEMORY LEAK FIX: Clear interval if the card was removed by acceptOrder()
+                if (!document.body.contains(card)) {
+                    clearInterval(countdown);
+                    return;
+                }
+
+                timeLeft--;
+                timerLabel.innerText = timeLeft + 's';
+                
+                if(timeLeft < 105 && badge) badge.style.display = 'none';
+
+                if (timeLeft <= 0) {
+                    clearInterval(countdown);
+                    card.style.opacity = '0';
+                    setTimeout(() => {
+                        card.remove();
+                        displayedOrderIds.delete(orderId);
+                        document.getElementById('order-count').innerText = displayedOrderIds.size;
+                        if(displayedOrderIds.size === 0) document.querySelector('.empty-state').style.display = 'block';
+                    }, 500);
+                }
+            }, 1000);
+        }
+
+        setInterval(pollForOrders, 5000);
+
+        function acceptOrder(orderId, orderRef) {
+            fetch(`/courier/api/accept-order/${orderId}/`, {
+                method: "POST",
+                headers: { "X-CSRFToken": csrftoken, "X-Requested-With": "XMLHttpRequest" }
+            })
+            .then(res => res.json())
+            .then(data => {
+                if(data.status === "success") {
+                    showToast("Order Accepted! Redirecting to tracker...");
+                    setTimeout(() => {
+                        window.location.href = `/courier/track/${orderRef}/`;
+                    }, 1500);
+                } else {
+                    showToast(data.message || "Order expired or taken by another courier");
+                    document.getElementById(`order-${orderId}`).remove();
+                    displayedOrderIds.delete(parseInt(orderId));
+                }
+            });
+        }
+
+        function toggleHistory() {
+            document.getElementById('history-panel').classList.toggle('active');
+        }
+
+        function toggleProfile() {
+            document.getElementById('profile-panel').classList.toggle('active');
+        }
+
+        function toggleStatus() {
+            const isOnline = document.getElementById('availability-toggle').checked;
+            const statusPill = document.querySelector('.status-pill');
+
+            if (isOnline) {
+                statusPill.classList.remove('offline');
+                statusPill.classList.add('available');
+                statusPill.innerHTML = '● Active';
+                showToast("You are now online and scanning for orders.");
+            } else {
+                statusPill.classList.remove('available');
+                statusPill.classList.add('offline');
+                statusPill.innerHTML = '● Offline';
+                showToast("You are offline. Alarms paused.");
+            }
+
+            fetch('/courier/api/toggle-status/', {
+                method: 'POST',
+                headers: { "X-CSRFToken": csrftoken, "Content-Type": "application/json" },
+                body: JSON.stringify({ is_available: isOnline })
+            });
+        }
+
+        function filterHistory() {
+            const searchVal = document.getElementById('history-search').value.toLowerCase().trim();
+            const items = document.querySelectorAll('.history-item');
+            const baseEmptyState = document.getElementById('history-base-empty');
+            const searchEmptyState = document.getElementById('history-search-empty');
+            
+            let visibleCount = 0;
+
+            items.forEach(item => {
+                // Convert the dataset attributes to lowercase for accurate matching
+                const customer = (item.getAttribute('data-customer') || "").toLowerCase();
+                const reference = (item.getAttribute('data-ref') || "").toLowerCase();
+
+                if (customer.includes(searchVal) || reference.includes(searchVal)) {
+                    item.style.display = 'block';
+                    visibleCount++;
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+
+            if (visibleCount === 0 && searchVal !== "") {
+                if (baseEmptyState) baseEmptyState.style.display = 'none';
+                searchEmptyState.style.display = 'block';
+            } else if (visibleCount === 0 && searchVal === "") {
+                if (baseEmptyState) baseEmptyState.style.display = 'block';
+                searchEmptyState.style.display = 'none';
+            } else {
+                if (baseEmptyState) baseEmptyState.style.display = 'none';
+                searchEmptyState.style.display = 'none';
+            }
+        }
+
+        /* --- Updated Profile AJAX Save Script (Fixed UI element references) --- */
+        function saveProfile() {
+            const username = document.getElementById('username').value;
+            const email = document.getElementById('email').value;
+            const loc1 = document.getElementById('loc1').value;
+            const loc2 = document.getElementById('loc2').value;
+            const btn = document.querySelector('.save-btn');
+            
+            btn.innerHTML = "<i class='bx bx-loader-alt bx-spin'></i> Saving...";
+            btn.style.opacity = '0.7';
+
+            fetch("{% url 'update_profile_ajax' %}", {
+                method: "POST",
+                headers: {
+                    "X-CSRFToken": csrftoken, 
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    "X-Requested-With": "XMLHttpRequest"
+                },
+                body: `username=${encodeURIComponent(username)}&email=${encodeURIComponent(email)}&loc1=${encodeURIComponent(loc1)}&loc2=${encodeURIComponent(loc2)}`
+            })
+            .then(response => response.json())
+            .then(data => {
+                if(data.status === "success") {
+                    // Update layout dynamic components safely using corrected ID selectors
+                    document.getElementById('display-locs').innerText = `${data.loc1} & ${data.loc2 || 'None'}`;
+                    document.getElementById('nav-username').innerText = data.username;
+                    document.getElementById('nav-avatar').innerText = data.username.charAt(0).toUpperCase();
+                    
+                    toggleProfile(); 
+                    showToast("Profile updated successfully!");
+                } else {
+                    showToast(data.message || "Could not save changes.");
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showToast("An error occurred.");
+            })
+            .finally(() => {
+                btn.innerHTML = "Save Changes";
+                btn.style.opacity = '1';
+            });
+        }
+
+        /* --- Delete Confirmation Modal Methods --- */
+        function openDeleteModal() {
+            document.getElementById('delete-confirm-modal').classList.add('show');
+        }
+
+        function closeDeleteModal() {
+            document.getElementById('delete-confirm-modal').classList.remove('show');
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById("toast");
+            document.getElementById("toast-text").innerText = msg;
+            toast.classList.add("show");
+            setTimeout(() => { toast.classList.remove("show"); }, 3000);
+        }
+    </script>
+</body>
+</html>
+
+

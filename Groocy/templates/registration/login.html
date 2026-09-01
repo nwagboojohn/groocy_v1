@@ -1,0 +1,73 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login Page</title>
+    <meta name="author" content="Groocy">
+    <meta name="description" content="Groocy is your go-to app for fast delivery, groceries, and essentials.">
+    <link href='https://cdn.boxicons.com/fonts/basic/boxicons.min.css' rel='stylesheet'>
+    <link href='https://cdn.boxicons.com/fonts/brands/boxicons-brands.min.css' rel='stylesheet'>
+    <link rel="stylesheet" href="{% static 'css/signup_login.css' %}">
+    <link rel="shortcut icon" href="{% static 'images/groocy-head-logo.png' %}" type="image/x-icon">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"/>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@100..800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Code+Latin:wght@100..700&family=Quicksand:wght@300..700&family=Sora:wght@100..800&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- sign up section -->
+    <section class="sign-up">
+        <img class="logo" src="{% static 'images/groocy-logo.png' %}" alt="">
+        <h2>Login</h2>
+
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }}">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
+
+        <form method="POST" action="{% url 'login' %}" class="form-detail">
+            {% csrf_token %}
+            <label for="username">Username</label>
+            <input type="text" class="input-field" id="username" name="username" placeholder="case sensitive" required>
+            
+            <div class="text-field">
+                <label for="password">Password</label>
+                <div class="password-fill">
+                    <input type="password" class="input-field" id="password" name="password" required>
+                    <p class="display-password">Show</p>
+                </div>
+                <div class="forget-password" style="display: flex; align-items: center; justify-content: space-between; font-size: 0.87rem; font-weight: 500; color: #e53838; margin-top: 10px;">
+                    <p>Forget Password?</p>
+                    <a href="{% url 'password_reset' %}" style="text-decoration: underline;">Reset</a>
+                </div>
+            </div>
+            <button type="submit" class="submit-btn">Login</button>
+        </form>
+        <p class="navigation-link">Don't have an account? <a href="{% url 'signup' %}">Signup</a></p>
+    </section>
+    
+    <!-- - JavaScript for password toggle  -->
+    <script>
+        document.querySelectorAll('.display-password').forEach(button => {
+            button.addEventListener('click', function() {
+                const passwordInput = this.previousElementSibling;
+                
+                if (passwordInput.type === 'password') {
+                    passwordInput.type = 'text';
+                    this.textContent = 'Hide';
+                } else {
+                    passwordInput.type = 'password';
+                    this.textContent = 'Show';
+                }
+            });
+        });
+    </script>
+</body>
+</html>
