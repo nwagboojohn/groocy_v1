@@ -137,11 +137,11 @@ EMAIL_HOST = 'smtp.gmail.com'
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
 EMAIL_HOST_USER = 'groocy01@gmail.com' # Your Gmail
-EMAIL_HOST_PASSWORD = env('EMAIL_PASSWORD') # Not login password, a Gmail "App Password"
-PAYSTACK_SECRET_KEY = env('PAYSTACK_SECRET_KEY')
-PAYSTACK_PUBLIC_KEY = env('PAYSTACK_PUBLIC_KEY')
+EMAIL_HOST_PASSWORD = env('EMAIL_PASSWORD', default='') # Not login password, a Gmail "App Password"
+PAYSTACK_SECRET_KEY = env('PAYSTACK_SECRET_KEY', default='')
+PAYSTACK_PUBLIC_KEY = env('PAYSTACK_PUBLIC_KEY', default='')
 DEFAULT_FROM_EMAIL = 'Groocy Delivery <groocy01@gmail.com>'
-DEBUG = env.bool('DEBUG', default=False)
+DEBUG = env.bool('DEBUG', default=True)
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
