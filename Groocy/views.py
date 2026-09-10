@@ -1,8 +1,9 @@
-import requests, json, random, secrets
+import requests, json, random, secrets, threading
 from django.shortcuts import render, redirect, get_object_or_404
 from django.conf import settings
 from django.http import JsonResponse
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.models import User
 from django.contrib.admin.views.decorators import staff_member_required
 from django.views.decorators.http import require_POST
 from .models import Product, Order, OrderItem, Profile, Category, DeliveryRating, CourierProfile
@@ -182,8 +183,6 @@ def logout_view(request):
         messages.info(request, "You logged out successfully!")
     return redirect('login')
 
-from django.contrib.auth.models import User
-
 
 def landing(request):
     # Fetch all products for the grid
@@ -338,7 +337,8 @@ def sync_cart(request):
                 'name': item['name'],
                 'price': item['price'],
                 'quantity': item['quantity'],
-                'image': item.get('image')
+                'image': item.get('image'),
+                'unit_type': item.get('unit_type', 'piece')
             }
         
         request.session['cart'] = session_cart
@@ -408,7 +408,7 @@ def verify_payment(request, ref):
                     product_image=item.get('image'),
                     price=item['price'],
                     quantity=item['quantity'],
-                    unit_type=item.get('unit_type', 'piece')
+                    unit_type=item.get('unit_type', 'piece').lower()
                 )
 
                 # 3. SUBTRACT STOCK IMMEDIATELY
@@ -503,7 +503,8 @@ def create_pod_order(request):
             product_name=item['name'],
             product_image=item.get('image'),
             price=item['price'],
-            quantity=item['quantity']
+            quantity=item['quantity'],
+            unit_type=item.get('unit_type', 'piece').lower()
         )
 
         # Atomic Stock Update
@@ -812,9 +813,9 @@ def customer_order_status_api(request, order_id):
         'cancelled_by': getattr(order, 'cancelled_by', None),
         'courier_name': order.courier.username if order.courier else "Courier",
         'customer_name': order.user.get_full_name() or order.user.username,
-        'packing_at': order.packing_at.strftime("%g:%i A") if order.packing_at else None,
-        'transit_at': order.transit_at.strftime("%g:%i A") if order.transit_at else None,
-        'delivered_at': order.delivered_at.strftime("%g:%i A") if order.delivered_at else None,
+        'packing_at': order.packing_at.strftime("%I:%M %p") if order.packing_at else None,
+        'transit_at': order.transit_at.strftime("%I:%M %p") if order.transit_at else None,
+        'delivered_at': order.delivered_at.strftime("%I:%M %p") if order.delivered_at else None,
     })
 
 
@@ -846,6 +847,238 @@ def admin_order_count(request):
     return JsonResponse({'count': count})
 
 
+
+@login_required
+def accept_order(request, order_id):
+    """Assigns the courier to the order using atomic database locking."""
+    if request.method == "POST":
+        if not hasattr(request.user, 'courier_profile'):
+            return JsonResponse({"status": "error", "message": "Unauthorized access."}, status=403)
+        
+        # Lock the order row in the DB during this transaction
+        with transaction.atomic():
+            try:
+                order = Order.objects.select_for_update().get(id=order_id)
+            except Order.DoesNotExist:
+                return JsonResponse({"status": "error", "message": "Order no longer exists."}, status=404)
+            
+            # Concurrency check
+            if order.courier is None and order.status == 'Accepted':
+                order.courier = request.user
+                order.accepted_at = timezone.now()
+                order.save()
+                return JsonResponse({"status": "success"})
+            else:
+                return JsonResponse({"status": "error", "message": "Order already taken or expired."})
+
+
+@login_required
+def update_profile_ajax(request):
+    if request.method == "POST":
+        user = request.user
+
+        # 1. SECURITY: Prevent crash if a normal user triggers this
+        if not hasattr(user, 'courier_profile'):
+            return JsonResponse({"status": "error", "message": "Access Denied: Not a courier profile."})
+        
+        profile = user.courier_profile
+        
+        # Update User details
+        new_username = request.POST.get('username')
+        new_email = request.POST.get('email')
+        
+        if new_username:
+            user.username = new_username
+        if new_email:
+            user.email = new_email
+        user.save()
+
+        # 2. Update Profile locations safely
+        loc1 = request.POST.get('loc1')
+        loc2 = request.POST.get('loc2', '') # Default to empty string if not provided
+
+        if loc1:
+            profile.location_1 = loc1
+        profile.location_2 = loc2
+
+        profile.save()
+        
+        return JsonResponse({
+            "status": "success", 
+            "username": user.username,
+            "email": user.email,
+            "loc1": profile.location_1, 
+            "loc2": profile.location_2
+        })
+
+
+def poll_orders(request):
+    """Fetches new unassigned orders less than 120s old for courier zones."""
+    try:
+        profile = request.user.courier_profile
+    except CourierProfile.DoesNotExist:
+        return JsonResponse({'orders': []})
+    
+    if not profile.is_available:
+        return JsonResponse({'orders': []})
+
+    now = timezone.now()
+    time_threshold = now - timedelta(seconds=120)
+
+    location_filter = Q(address__icontains=profile.location_1)
+    if profile.location_2:
+        location_filter |= Q(address__icontains=profile.location_2)
+
+    new_orders = Order.objects.filter(
+        location_filter,
+        status='Accepted',
+        courier__isnull=True,
+        created_at__gte=time_threshold
+    )
+
+    orders_list = []
+    for o in new_orders:
+        time_elapsed = (now - o.created_at).total_seconds()
+        time_left = max(0, int(120 - time_elapsed))
+        
+        if time_left > 0:
+            orders_list.append({
+                'id': o.id,
+                'ref': o.ref,
+                'address': o.address,
+                'amount': float(o.amount) if o.amount else 0.0,
+                'time_left': time_left
+            })
+
+    # Fetch orders taken in the last 10 seconds across matching zones
+    recent_accepted_threshold = now - timedelta(seconds=10)
+    taken_orders = Order.objects.filter(
+        location_filter,
+        courier__isnull=False,
+        accepted_at__gte=recent_accepted_threshold
+    ).select_related('courier')
+
+    recently_accepted = [
+        {
+            'id': o.id,
+            'ref': o.ref,
+            'courier_name': o.courier.username  # Or o.courier.first_name
+        }
+        for o in taken_orders
+    ]
+
+    return JsonResponse({
+        'orders': orders_list,
+        'recently_accepted': recently_accepted 
+    })
+
+
+@login_required
+def update_order_stage(request, order_id):
+    if request.method == "POST":
+        try:
+            data = json.loads(request.body)
+            new_stage = data.get('stage')
+
+            # 1. Use atomic transaction and row locking to prevent double-clicking
+            with transaction.atomic():
+                order = get_object_or_404(Order.objects.select_for_update(), id=order_id)
+
+                # 2. Block rapid-fire requests if already processed
+                if order.status in ['Cancelled', 'Delivered', 'Completed']:
+                    return JsonResponse({'success': True, 'already_delivered': True, 'stage': order.status})
+
+                if new_stage == 'Packing':
+                    order.packing_at = timezone.now()
+                    order.status = 'Packing'
+
+                elif new_stage == 'Delivering':
+                    order.transit_at = timezone.now()
+                    order.status = 'Transit'
+
+                elif new_stage == 'Delivered':
+                    order.delivered_at = timezone.now()
+                    order.status = 'Delivered'
+                    
+                    # 3. SAFE Decimal conversion (Prevents 500 error if fee is None)
+                    fee_val = order.shipping_fee if order.shipping_fee else 0
+                    fee = Decimal(str(fee_val))
+                    commission = fee * Decimal('0.05') # 5%
+                    
+                    if order.courier and hasattr(order.courier, 'courier_profile'):
+                        courier_profile = order.courier.courier_profile
+                        courier_profile.balance += commission
+                        courier_profile.save()
+
+                    # 4. Threaded Email (Prevents the "Finish" button from spinning endlessly)
+                    try:
+                        email_thread = threading.Thread(
+                            target=send_groocy_email,
+                            args=(
+                                order.user.email,
+                                f"Groocy Order Delivered: {order.ref}",
+                                "emails/order_confirmation.html",
+                                {
+                                    'user': order.user,
+                                    'order': order,
+                                    'items': list(order.items.all()), # Evaluate to list before threading
+                                    'amount_naira': order.amount
+                                }
+                            )
+                        )
+                        email_thread.start()
+                    except Exception as e:
+                        print(f"Threaded email error: {e}")
+
+                elif new_stage == 'Cancelled':
+                    order.status = 'Cancelled'
+                    order.cancelled_by = 'Courier'
+
+                elif new_stage == 'Timeout':
+                    order.status = 'Cancelled'
+                    order.cancelled_by = 'System'
+
+                order.save()
+                return JsonResponse({'success': True, 'stage': order.status})
+                
+        except Exception as e:
+            print(f"Error in update_order_stage: {e}")
+            return JsonResponse({'success': False, 'error': "Server processing error."}, status=500)
+
+
+@login_required
+def customer_track_order(request, ref):
+    order = get_object_or_404(Order, ref=ref)
+    
+    # Sync timer for customer as well
+    remaining_time = 900 
+    if order.accepted_at:
+        time_elapsed = (now() - order.accepted_at).total_seconds()
+        remaining_time = max(0, int(900 - time_elapsed))
+
+    return render(request, 'shop/track_order.html', {
+        'order': order,
+        'remaining_time': remaining_time
+    })
+
+
+def cancel_order_customer(request, ref):
+    order = get_object_or_404(Order, ref=ref)
+    
+    if request.method == "POST":
+        # Check if courier is already in transit
+        if order.status == 'In Transit' or order.transit_at is not None:
+            penalty = 200
+            order.amount += penalty
+            # Optionally log this to a 'Penalty' table for accounting
+        
+        order.status = 'Cancelled'
+        order.cancelled_by = 'Customer'  # <--- Track who did it
+        order.save()
+        
+        return JsonResponse({"success": True})
+
+
 @login_required
 def courier_dashboard(request):
     # SECURITY FIX: Block normal customers from accessing this view
@@ -873,7 +1106,7 @@ def courier_dashboard(request):
     order_history = Order.objects.filter(
         courier=request.user,
         status__in=['Delivered', 'Cancelled']
-    ).order_by('-id')
+    ).select_related('user').order_by('-id')
 
     return render(request, 'courier/courier_dashboard.html', {
         'orders': relevant_orders,
@@ -961,195 +1194,6 @@ def courier_track_order(request, ref):
         'remaining_time': remaining_time
     })
 
-
-@login_required
-def accept_order(request, order_id):
-    """Assigns the courier to the order."""
-    if request.method == "POST":
-        # Ensure the user is actually a courier
-        if not hasattr(request.user, 'courier_profile'):
-            return JsonResponse({"status": "error", "message": "Unauthorized access."}, status=403)
-        
-        order = get_object_or_404(Order, id=order_id)
-        
-        # Concurrency check: Ensure no one else took it in the last split second
-        if order.courier is None and order.status == 'Accepted':
-            order.courier = request.user
-            order.accepted_at = timezone.now() #  <-- FIX: Save the exact timestamp here!
-            order.save()
-            return JsonResponse({"status": "success"})
-        else:
-            return JsonResponse({"status": "error", "message": "Order already taken or expired"})
-            
-
-@login_required
-def update_profile_ajax(request):
-    if request.method == "POST":
-        user = request.user
-
-        # 1. SECURITY: Prevent crash if a normal user triggers this
-        if not hasattr(user, 'courier_profile'):
-            return JsonResponse({"status": "error", "message": "Access Denied: Not a courier profile."})
-        
-        profile = user.courier_profile
-        
-        # Update User details
-        new_username = request.POST.get('username')
-        new_email = request.POST.get('email')
-        
-        if new_username:
-            user.username = new_username
-        if new_email:
-            user.email = new_email
-        user.save()
-
-        # 2. Update Profile locations safely
-        loc1 = request.POST.get('loc1')
-        loc2 = request.POST.get('loc2', '') # Default to empty string if not provided
-
-        if loc1:
-            profile.location_1 = loc1
-        profile.location_2 = loc2
-
-        profile.save()
-        
-        return JsonResponse({
-            "status": "success", 
-            "username": user.username,
-            "email": user.email,
-            "loc1": profile.location_1, 
-            "loc2": profile.location_2
-        })
-
-
-def poll_orders(request):
-    """Fetches new orders in real-time that are less than 120s old, unassigned, and match the courier's zones."""
-    try:
-        profile = request.user.courier_profile
-    except CourierProfile.DoesNotExist:
-        return JsonResponse({'orders': []})
-    
-    if not profile.is_available:
-        return JsonResponse({'orders': []})
-
-    # Find orders created in the last 120 seconds that haven't been picked up
-    time_threshold = timezone.now() - timedelta(seconds=120)
-
-    # 1. Start with the required location_1 Zone
-    location_filter = Q(address__icontains=profile.location_1)
-
-    # 2. Safely layer location_2 only if the courier configured it
-    if profile.location_2:
-        location_filter |= Q(address__icontains=profile.location_2)
-
-    # 3. Apply the combined query constraints directly to the database layer #todo: Fetch full objects instead of just values to use model methods/properties if needed
-    new_orders = Order.objects.filter(
-        location_filter,
-        status='Accepted',
-        courier__isnull=True,
-        created_at__gte=time_threshold
-    )#.values('id', 'ref', 'address', 'created_at', 'amount')
-
-    orders_list = []
-    for o in new_orders:
-        # Calculate time left on the server
-        time_elapsed = (timezone.now() - o.created_at).total_seconds()
-        time_left = max(0, int(120 - time_elapsed))
-        
-        orders_list.append({
-            'id': o.id,
-            'ref': o.ref,
-            'address': o.address,
-            'amount': o.amount,
-            'time_left': time_left  # Send pre-calculated time to JS
-        })
-
-    return JsonResponse({'orders': orders_list})     
-
-
-@login_required
-def update_order_stage(request, order_id):
-    if request.method == "POST":
-        order = get_object_or_404(Order, id=order_id)
-        data = json.loads(request.body)
-        new_stage = data.get('stage')
-        
-        # Map frontend stages to backend timestamps
-        if new_stage == 'Packing':
-            order.packing_at = timezone.now()
-            order.status = 'Packing'
-        elif new_stage == 'Delivering': # Match this to your frontend 'data-stage'
-            order.transit_at = timezone.now()
-            order.status = 'Transit'
-        elif new_stage == 'Delivered':
-            order.delivered_at = timezone.now()
-            order.status = 'Delivered'
-            
-            # 3. Currency Fix: Assuming shipping_fee is in kobo, convert to Naira
-            # Commission calculation
-            # Ensure shipping_fee is Decimal or float
-            fee = Decimal(str(order.shipping_fee))
-            commission = fee * Decimal('0.05') # 5%
-            
-            courier_profile = order.courier.courier_profile
-            courier_profile.balance += commission
-            courier_profile.save()
-
-            # Trigger Email
-            try:
-                send_groocy_email(
-                    order.user.email,
-                    f"Groocy Order Delivered: {order.ref}",
-                    "emails/order_confirmation.html",
-                    {
-                        'user': order.user,
-                        'order': order,
-                        'items': order.items.all(),
-                        'amount_naira': order.amount
-                    }
-                )
-            except Exception as e:
-                print(f"Email error: {e}")
-
-        elif new_stage == 'Cancelled':
-            order.status = 'Cancelled'
-            order.cancelled_by = 'Courier'  # <--- Track who did it
-
-        order.save()
-        return JsonResponse({'success': True, 'stage': order.status})
-        
-
-@login_required
-def customer_track_order(request, ref):
-    order = get_object_or_404(Order, ref=ref)
-    
-    # Sync timer for customer as well
-    remaining_time = 900 
-    if order.accepted_at:
-        time_elapsed = (now() - order.accepted_at).total_seconds()
-        remaining_time = max(0, int(900 - time_elapsed))
-
-    return render(request, 'shop/track_order.html', {
-        'order': order,
-        'remaining_time': remaining_time
-    })
-
-
-def cancel_order_customer(request, ref):
-    order = get_object_or_404(Order, ref=ref)
-    
-    if request.method == "POST":
-        # Check if courier is already in transit
-        if order.status == 'In Transit' or order.transit_at is not None:
-            penalty = 200
-            order.amount += penalty
-            # Optionally log this to a 'Penalty' table for accounting
-        
-        order.status = 'Cancelled'
-        order.cancelled_by = 'Customer'  # <--- Track who did it
-        order.save()
-        
-        return JsonResponse({"success": True})
 
 def toggle_status(request):
     if request.method == 'POST':

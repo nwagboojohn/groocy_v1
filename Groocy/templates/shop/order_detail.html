@@ -11,77 +11,86 @@
     <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
     <link rel="shortcut icon" href="{% static 'images/groocy-head-logo.png' %}" type="image/x-icon">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&family=Sora:wght@600;700&display=swap" rel="stylesheet">
+    <style>
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 14px;
+            border-radius: 50px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            text-transform: capitalize;
+        }
+
+        /* Status colors */
+        .status-badge.accepted,
+        .status-badge.pending { 
+            background: #fff3cd; 
+            color: #856404; 
+        }
+
+        .status-badge.packing,
+        .status-badge.processing { 
+            background: #cce5ff; 
+            color: #004085; 
+        }
+
+        .status-badge.transit { 
+            background: #e2e5ff; 
+            color: #2b3db5; 
+        }
+
+        .status-badge.delivered,
+        .status-badge.ready { 
+            background: #daf9e1; 
+            color: #155724; 
+        }
+
+        .status-badge.cancelled { 
+            background: #fde4e4; 
+            color: #e74c3c; 
+        }
+
+        /* Unit Type Badge Styling */
+        .unit-badge {
+            padding: 3px 6px;
+            border-radius: 4px;
+            font-size: 0.85em;
+            font-weight: 600;
+            margin: 0 4px;
+            display: inline-block;
+        }
+
+        .unit-piece {
+            background-color: #e5e7eb; 
+            color: #4b5563; 
+        }
+
+        .unit-carton, 
+        .unit-pack {
+            background-color: #6b21a8; 
+            color: #ffffff !important;
+        }
+
+        @media print {
+            .back-link, button, .bx-arrow-back {
+                display: none !important;
+            }
+            .detail-container {
+                border: none !important;
+                margin: 0 !important;
+                width: 100% !important;
+                max-width: none !important;
+            }
+        }
+    </style>
 </head>
-<style>
-    .status-badge {
-        padding: 4px 12px;
-        border-radius: 8px;
-        font-size: 0.75rem;
-        font-weight: 600;
-    }
-
-    @media print {
-        .back-link, button, .bx-arrow-back {
-            display: none !important;
-        }
-        .detail-container {
-            border: none !important;
-            margin: 0 !important;
-            width: 100% !important;
-            max-width: none !important;
-        }
-    }
-
-    /* Base badge structure */
-    .status-badge {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        padding: 6px 14px;
-        border-radius: 50px;
-        font-size: 0.85rem;
-        font-weight: 600;
-        text-transform: capitalize;
-    }
-
-    /* 1. Accepted / Received (Waiting for action) */
-    .status-badge.accepted,
-    .status-badge.pending { 
-        background: #fff3cd; 
-        color: #856404; 
-    }
-
-    /* 2. Packing Order (In progress inside store) */
-    .status-badge.packing,
-    .status-badge.processing { 
-        background: #cce5ff; 
-        color: #004085; 
-    }
-
-    /* 3. Out for Delivery (In transit across campus) */
-    .status-badge.transit { 
-        background: #e2e5ff; 
-        color: #2b3db5; 
-    }
-
-    /* 4. Successfully Delivered (Mission Complete) */
-    .status-badge.delivered,
-    .status-badge.ready { 
-        background: #daf9e1; 
-        color: #155724; 
-    }
-
-    /* 5. Cancelled (Customer or Courier side abort) */
-    .status-badge.cancelled { 
-        background: #fde4e4; 
-        color: #e74c3c; 
-    }
-</style>
 <body>
     <div class="detail-container" style="max-width: 500px; margin: 20px auto; font-family: 'Poppins', sans-serif; padding: 20px; border: 1px solid #eee; border-radius: 15px;">
         <div style="text-align: center; margin-bottom: 20px;">
             <h2 style="font-family: 'Sora'; margin-bottom: 5px;">Order Details</h2>
-            <span class="status-badge {{ order.status|lower }}" style="padding: 5px 15px; border-radius: 20px; font-size: 0.8rem; font-weight: 600;">
+            <span class="status-badge {{ order.status|lower }}">
                 {{ order.status|upper }}
             </span>
         </div>
@@ -91,7 +100,6 @@
             <div>
                 <h4 style="margin: 0; font-size: 0.9rem; color: #2e7d32;">Delivery Address</h4>
                 <p style="margin: 3px 0 0; font-size: 0.85rem; color: #444; line-height: 1.4;">
-                    {# Use order.address first! It is the permanent record for THIS purchase #}
                     {{ order.address|default:order.user.profile.address|default:"No address recorded" }}
                 </p>
             </div>
@@ -123,7 +131,13 @@
                         </div>
                         <div>
                             <p style="margin: 0; font-weight: 600;">{{ item.product_name }}</p>
-                            <small style="color: #6f6f6f;">Qty: {{ item.quantity }} × ₦{{ item.price }}</small>
+                            <small style="color: #6f6f6f;">
+                                Qty: {{ item.quantity }} 
+                                <span class="unit-badge unit-{{ item.unit_type|lower }}">
+                                    {{ item.unit_type|title }}
+                                </span> 
+                                × ₦{{ item.price }}
+                            </small>
                         </div>
                     </div>
                     <span style="font-weight: 600;">₦{{ item.get_total_item_price }}</span>
@@ -190,8 +204,6 @@
 
     <script>
         function downloadReceipt() {
-            // This triggers the system print dialog. 
-            // Most modern phones/computers default to "Save as PDF"
             window.print();
         }
     </script>

@@ -1,3 +1,26 @@
+<style>
+    /* Unit Type Badge Styling */
+    .unit-badge {
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-size: 0.75em;
+        font-weight: 600;
+        margin: 0 4px;
+        display: inline-block;
+    }
+
+    .unit-piece {
+        background-color: #e5e7eb; 
+        color: #4b5563; 
+    }
+
+    .unit-carton, 
+    .unit-pack {
+        background-color: #6b21a8; 
+        color: #ffffff !important;
+    }
+</style>
+
 <div style="max-width: 600px; margin: 0 auto; font-family: sans-serif; border: 1px solid #e0e0e0; border-radius: 12px; overflow: hidden;">
     <div style="background-color: #4CAF50; padding: 30px; text-align: center;">
         <h1 style="color: white; margin: 0; font-size: 24px;">Order Confirmed! 🛒</h1>
@@ -32,8 +55,13 @@
                     {% for item in items %}
                     <tr style="border-bottom: 1px solid #f2f2f2; font-size: 14px;">
                         <td style="padding: 12px 5px;">
-                            <b>{{ item.product_name }}</b>
-                            <small style="color: #777;">₦{{ item.price }} each</small>
+                            <b>{{ item.product_name }}</b><br>
+                            <small style="color: #777;">
+                                ₦{{ item.price }} per 
+                                <span class="unit-badge unit-{{ item.unit_type|lower }}">
+                                    {{ item.unit_type|title }}
+                                </span>
+                            </small>
                         </td>
                         <td style="padding: 12px 5px; text-align: center;">x {{ item.quantity }}</td>
                         <td style="padding: 12px 5px; text-align: right;">₦{{ item.get_total_item_price }}</td>
@@ -87,3 +115,5 @@
         <b>Groocy HQ</b> | Fast Delivery for Covenant University Students.
     </div>
 </div>
+
+

@@ -164,6 +164,28 @@
             white-space: nowrap;
         }
 
+        .unit-badge {
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.85em;
+            font-weight: 600;
+            margin: 0 4px;
+            display: inline-block;
+        }
+
+        /* Light grey background, grey text for Piece */
+        .unit-piece {
+            background-color: #e5e7eb; 
+            color: #4b5563; 
+        }
+
+        /* Purple background, white text for Carton and Pack */
+        .unit-carton, 
+        .unit-pack {
+            background-color: #6b21a8; 
+            color: #ffffff;
+        }
+
         /* --- Header Section --- */
         .track-header {
             display: flex;
@@ -423,7 +445,13 @@
                             <img src="{{ item.product_image }}" alt="{{ item.product_name }}" class="item-img">
                             <div class="item-details">
                                 <p>{{ item.product_name }}</p>
-                                <small>Qty: {{ item.quantity }} × ₦{{ item.price }}</small>
+                                <small>
+                                    Qty: {{ item.quantity }} 
+                                    <span class="unit-badge unit-{{ item.unit_type|lower }}">
+                                        {{ item.unit_type|title }}
+                                    </span> 
+                                    × ₦{{ item.price }}
+                                </small>
                             </div>
                         </div>
                         <span class="item-price">₦{{ item.get_total_item_price }}</span>
@@ -595,33 +623,40 @@
         }, 4000);
 
         // Safe Timer Initialization Engine
-        const rawAccepted = "{{ order.accepted_at|date:'M d, Y H:i:s' }}";
-        const rawCreated = "{{ order.created_at|date:'M d, Y H:i:s' }}";
+        let rawDistance = parseInt("{{ remaining_time }}");
+        let distance = isNaN(rawDistance) ? 900 : rawDistance; 
 
-        const baseTimeStr = rawAccepted.trim() !== "" ? rawAccepted : rawCreated;
-        const baseTimestamp = new Date(baseTimeStr).getTime();
-        const targetDate = baseTimestamp + (15 * 60 * 1000);
+        const timerDisplay = document.getElementById("main-timer");
 
         timerInterval = setInterval(function() {
-            const now = new Date().getTime();
-            const distance = targetDate - now;
-            const timerDisplay = document.getElementById("main-timer");
-
             if (distance > 0) {
-                const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
-                const seconds = Math.floor((distance % (1000 * 60)) / 1000);
-
+                const minutes = Math.floor(distance / 60);
+                const seconds = distance % 60;
+                
                 if (minutes > 0) {
                     timerDisplay.innerHTML = `${minutes} mins ${seconds} sec`;
                 } else {
                     timerDisplay.innerHTML = `${seconds} sec`;
                 }
-            } else {
+                distance--; 
+                
+            // GUARD: Strictly check for <= 0. NaN will fail this check and safely do nothing.
+            } else if (distance <= 0) { 
                 clearInterval(timerInterval);
-                timerDisplay.innerHTML = "LATE";
-                timerDisplay.style.color = "var(--danger)";
-                document.getElementById('reorder-btn').classList.remove('disabled');
-                document.getElementById('reorder-btn').disabled = false;
+                timerDisplay.innerHTML = "TIME UP";
+                
+                const timeoutMsg = "Order was automatically cancelled because the delivery time elapsed.";
+                
+                fetch(`/api/cancel-order-customer/{{ order.ref }}/`, {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json', 
+                        'X-CSRFToken': '{{ csrf_token }}' 
+                    },
+                    body: JSON.stringify({ reason: 'Timeout' }) 
+                }).finally(() => {
+                    window.location.href = `{% url 'payment_error' %}?error=${encodeURIComponent(timeoutMsg)}`;
+                });
             }
         }, 1000);
 
@@ -658,7 +693,14 @@
         function replaceOrder() {
             const items = [
                 {% for item in order.items.all %}
-                { id: "{{ item.id }}", name: "{{ item.product_name }}", price: "{{ item.price }}", quantity: {{ item.quantity }}, image: "{{ item.product_image }}" },
+                { 
+                    id: "{{ item.id }}", 
+                    name: "{{ item.product_name }}", 
+                    price: "{{ item.price }}", 
+                    quantity: {{ item.quantity }}, 
+                    unit_type: "{{ item.unit_type|default:'piece' }}", // <-- Added unit_type for cart persistence
+                    image: "{{ item.product_image }}" 
+                },
                 {% endfor %}
             ];
             localStorage.setItem('groocyCart', JSON.stringify(items));

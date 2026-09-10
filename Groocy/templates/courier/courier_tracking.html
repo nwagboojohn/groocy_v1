@@ -10,7 +10,9 @@
     <link rel="shortcut icon" href="{% static 'images/groocy-head-logo.png' %}" type="image/x-icon">
 </head>
 <body>
+
     {% csrf_token %}
+
     <div class="tracking-container">
         <!-- Time & Customer Header -->
         <div class="top-meta">
@@ -28,7 +30,7 @@
         </div>
 
         <div class="card-main">
-            <!-- New: Order Details Button -->
+            <!-- Order Details Button -->
             <button class="details-trigger" onclick="toggleDetailsModal()">
                 <i class='bx bx-list-check'></i> View Items to Pack
             </button>
@@ -69,14 +71,14 @@
                 </div>
 
                 <!-- Stage 3 -->
-                <div class="step-row {% if order.delivered_at %}active{% endif %}">
+                <div class="step-row {% if order.delivered_at or order.status == 'Delivered' or order.status == 'Completed' %}active{% endif %}">
                     <div class="indicator"></div>
                     <div class="step-content">
                         <h5>Delivered</h5>
                         <small>Handover to customer</small>
                     </div>
-                    <button class="stage-btn success" data-stage="Delivered" {% if not order.transit_at or order.delivered_at %}disabled{% endif %}>
-                        Finish
+                    <button class="stage-btn success" data-stage="Delivered" {% if not order.transit_at or order.delivered_at or order.status == 'Delivered' or order.status == 'Completed' %}disabled{% endif %}>
+                        {% if order.delivered_at or order.status == 'Delivered' or order.status == 'Completed' %}Done{% else %}Finish{% endif %}
                     </button>
                 </div>
             </div>
@@ -90,26 +92,32 @@
                     </div>
                     <div class="order-items">
                         {% for item in order.items.all %}
-                            <div class="item-preview" style="display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #f0f0f0;">
-                                <div style="display: flex; align-items: center; gap: 12px;">
-                                    {% if item.product_image %}
-                                        <img src="{{ item.product_image }}" alt="{{ item.product_name }}" style="width: 48px; height: 48px; border-radius: 8px; object-fit: cover;">
-                                    {% else %}
-                                        <div style="width: 48px; height: 48px; border-radius: 8px; background: #eee; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; color: #888;">
-                                            <i class='bx bx-package'></i>
-                                        </div>
-                                    {% endif %}
-                                    <div>
-                                        <h3 style="font-size: 0.88rem; margin: 0; color: #222;">{{ item.product_name }}</h3>
-                                        <p style="font-size: 12px; margin: 4px 0; color: #666;">Qty: {{ item.quantity }} x ₦{{ item.price }}</p>
-                                    </div>
+                        <div class="item-preview" style="display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #f0f0f0;">
+                            <div style="display: flex; align-items: center; gap: 12px;">
+                                {% if item.product_image %}
+                                <img src="{{ item.product_image }}" alt="{{ item.product_name }}" style="width: 48px; height: 48px; border-radius: 8px; object-fit: cover;">
+                                {% else %}
+                                <div style="width: 48px; height: 48px; border-radius: 8px; background: #eee; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; color: #888;">
+                                    <i class='bx bx-package'></i>
                                 </div>
-                                <span style="font-weight: 600; font-size: 0.88rem; color: #333;">₦{{ item.get_total_item_price }}</span>
+                                {% endif %}
+                                <div>
+                                    <h3 style="font-size: 0.88rem; margin: 0; color: #222;">{{ item.product_name }}</h3>
+                                    <p style="font-size: 12px; margin: 4px 0; color: #666;">
+                                        Qty: {{ item.quantity }} 
+                                        <span class="unit-badge unit-{{ item.unit_type|lower }}">
+                                            {{ item.unit_type|title }}
+                                        </span> 
+                                        × ₦{{ item.price }}
+                                    </p>
+                                </div>
                             </div>
+                            <span style="font-weight: 600; font-size: 0.88rem; color: #333;">₦{{ item.get_total_item_price }}</span>
+                        </div>
                         {% empty %}
-                            <div style="padding: 20px; text-align: center; color: #777;">
-                                <p>No items found for this order.</p>
-                            </div>
+                        <div style="padding: 20px; text-align: center; color: #777;">
+                            <p>No items found for this order.</p>
+                        </div>
                         {% endfor %}
                     </div>
                 </div>
@@ -134,41 +142,54 @@
     </div>
 
     <script>
-        let timeLeft = parseInt("{{ remaining_time }}") || 900;
+        let rawTimeLeft = parseInt("{{ remaining_time }}");
+        let timeLeft = isNaN(rawTimeLeft) ? 900 : rawTimeLeft;
+        let isUpdatingStage = false;
+
         const timerDisplay = document.getElementById('timer-display');
 
         const countdown = setInterval(() => {
-            if (!timerDisplay) return; // FIX: Prevent error if element missing
+            if (!timerDisplay) return;
 
-            if (timeLeft <= 0) {
-                clearInterval(countdown);
-                timerDisplay.innerText = "Time Expired";
-                timerDisplay.style.color = "red";
-            } else {
-                let minutes = Math.floor(timeLeft / 60);
-                let seconds = timeLeft % 60;
-                
-                // NEW TIME FORMATTING LOGIC
+            if (timeLeft > 0) {
+                const minutes = Math.floor(timeLeft / 60);
+                const seconds = timeLeft % 60;
+
                 if (minutes > 0) {
                     timerDisplay.innerText = `${minutes} mins ${seconds} sec`;
                 } else {
                     timerDisplay.innerText = `${seconds} sec`;
                 }
                 timeLeft--;
+
+            } else if (timeLeft <= 0) {
+                clearInterval(countdown);
+                timerDisplay.innerText = "TIME EXPIRED";
+
+                const timeoutMsg = "Mission timed out. The order has been automatically cancelled.";
+
+                fetch(`/courier/api/update-stage/{{ order.id }}/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': '{{ csrf_token }}'
+                    },
+                    body: JSON.stringify({ stage: 'Timeout' })
+                }).finally(() => {
+                    window.location.href = `{% url 'payment_error' %}?error=${encodeURIComponent(timeoutMsg)}&user_type=courier`;
+                });
             }
         }, 1000);
 
-        // --- NEW: COURIER LISTENER FOR CUSTOMER CANCELLATIONS ---
         const pollCancellation = setInterval(async () => {
             try {
                 const res = await fetch(`/api/order-status/{{ order.ref }}/`);
                 const data = await res.json();
-                
+
                 if (data.status === 'Cancelled') {
                     clearInterval(pollCancellation);
                     clearInterval(countdown);
-                    
-                    // Convert to lowercase to prevent case-matching bugs ('Customer' vs 'customer')
+
                     const dynamicCancelledBy = data.cancelled_by ? String(data.cancelled_by).toLowerCase() : '';
                     let outMessage = "The order was cancelled.";
 
@@ -177,15 +198,18 @@
                     } else if (dynamicCancelledBy === 'courier') {
                         outMessage = "You cancelled this mission.";
                     }
-                    
+
                     window.location.href = `{% url 'payment_error' %}?error=${encodeURIComponent(outMessage)}&user_type=courier`;
+                } else if (data.status === 'Delivered' || data.status === 'Completed') {
+                    clearInterval(pollCancellation);
+                    clearInterval(countdown);
+                    window.location.href = "{% url 'courier_dashboard' %}";
                 }
             } catch (err) {
                 console.error("Error checking customer active status:", err);
             }
-        }, 4000)
+        }, 4000);
 
-        // Buttons Fix: Attach event listeners to all stage & cancel buttons
         document.querySelectorAll('.stage-btn').forEach(button => {
             button.addEventListener('click', function() {
                 const stage = this.getAttribute('data-stage');
@@ -193,59 +217,71 @@
             });
         });
 
-
-        function handleTimeout() {
-            timerDisplay.innerText = "TIMEOUT";
-            document.getElementById('timer-container').style.background = "#ff4757";
-            alert("Mission Timed Out. Order is being reassigned.");
-            cancelOrder(); // Trigger the cancel logic
-        }
-
         function updateStage(stage, btnElement) {
-            // 1. IMMEDIATELY DISABLE to stop double-pay/double-clicks
-            if(btnElement) {
+            if (isUpdatingStage) return;
+            isUpdatingStage = true;
+
+            const originalHtml = btnElement ? btnElement.innerHTML : stage;
+
+            if (btnElement) {
                 btnElement.disabled = true;
-                btnElement.innerHTML = "<i class='bx bx-loader-alt bx-spin'></i>";
+                btnElement.innerHTML = "<i class='bx bx-loader-alt bx-spin'></i> Processing...";
             }
 
             fetch(`/courier/api/update-stage/{{ order.id }}/`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
                 body: JSON.stringify({ stage: stage })
             })
             .then(response => response.json())
             .then(data => {
-                if (data.success) {
+                if (data.success || data.already_delivered) {
                     if (stage === 'Delivered') {
-                        // 2. Show Success Toast
+                        if (btnElement) {
+                            btnElement.disabled = true;
+                            btnElement.innerHTML = "Done";
+                        }
+
                         const toast = document.getElementById('successToast');
-                        if(toast) toast.classList.add('show');
-                        
-                        // Delay redirect so they can see the toast
+                        if (toast) toast.classList.add('show');
+
                         setTimeout(() => {
                             window.location.href = "{% url 'courier_dashboard' %}";
-                        }, 2500);
+                        }, 2000);
                     } else if (stage === 'Cancelled') {
+                        const outMessage = "You cancelled this mission.";
                         window.location.href = `{% url 'payment_error' %}?error=${encodeURIComponent(outMessage)}&user_type=courier`;
                     } else {
-                        location.reload(); // Keep them on page for other stages
+                        location.reload();
                     }
+                } else {
+                    alert(data.error || "An error occurred.");
+                    if (btnElement) {
+                        btnElement.disabled = false;
+                        btnElement.innerHTML = originalHtml;
+                    }
+                    isUpdatingStage = false;
                 }
             })
             .catch(err => {
-                console.error("Error:", err);
-                if(btnElement) btnElement.disabled = false;
+                console.error("Error updating stage:", err);
+                alert("Network communication error. Please check your connection and try again.");
+                if (btnElement) {
+                    btnElement.disabled = false;
+                    btnElement.innerHTML = originalHtml;
+                }
+                isUpdatingStage = false;
             });
         }
 
         function toggleDetailsModal() {
             const modal = document.getElementById('detailsModal');
-            
-            // 1. Toggle class if CSS uses active class
             modal.classList.toggle('active');
             modal.classList.toggle('show');
 
-            // 2. Computed style check safeguard for inline display switching
             const currentDisplay = window.getComputedStyle(modal).display;
             if (currentDisplay === 'none') {
                 modal.style.display = 'flex';
@@ -254,13 +290,11 @@
             }
         }
 
-        // Function to cancel order
         document.getElementById('cancel-mission-btn').addEventListener('click', function() {
-            if(confirm("Cancel this order? No commission will be added.")) {
+            if (confirm("Cancel this order? No commission will be added.")) {
                 updateStage('Cancelled', this);
             }
         });
-
     </script>
 </body>
 </html>

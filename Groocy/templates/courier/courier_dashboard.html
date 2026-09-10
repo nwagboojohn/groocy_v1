@@ -287,7 +287,7 @@
     {% csrf_token %}
 
     <!-- Base64 short notification beep -->
-    <audio id="orderAlarm" src="audio/order_alert.mp3" preload="auto"></audio>
+    <audio id="orderAlarm" src="{% static 'audio/order_alert.mp3' %}" preload="auto"></audio>
 
     <div class="fintech-dashboard">
         <nav class="dash-nav">
@@ -341,7 +341,7 @@
             
             <div id="order-list">
                 {% for order in orders %}
-                <div class="fin-card order-request" id="order-{{ order.id }}" data-timeleft="120">
+                <div class="fin-card order-request" id="order-{{ order.id }}" data-created="{{ order.created_at|date:'U' }}">
                     <div class="card-left">
                         <div class="icon-box"><i class='bx bx-package'></i></div>
                         <div class="card-details">
@@ -511,44 +511,47 @@
     </div>
 
     <script>
-        // Set to keep track of orders already on the screen
+        // Always store order IDs as Numbers for reliable Set operations
         let displayedOrderIds = new Set();
-        const csrftoken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+        const csrftoken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || '';
 
-        // --- NEW INITIALIZATION BLOCK ---
-        // Run this immediately when the page loads to activate Django's static HTML cards
+        // --- INITIALIZATION BLOCK ---
         document.addEventListener("DOMContentLoaded", () => {
             const existingCards = document.querySelectorAll('.order-request');
             
+            // Calculate remaining time relative to server render time instead of device clock
+            const serverNow = parseInt("{{ now|date:'U' }}", 10) || Math.floor(Date.now() / 1000);
+
             existingCards.forEach(card => {
-                // 1. Extract ID and add to our set so polling doesn't duplicate it
-                const orderId = parseInt(card.id.split('-')[1]);
-                displayedOrderIds.add(orderId);
+                const rawId = card.id.replace('order-', '');
+                const orderId = parseInt(rawId, 10);
+                if (!isNaN(orderId)) displayedOrderIds.add(orderId);
 
-                // 2. Calculate remaining time (Django 'U' gives seconds, JS uses ms)
-                const createdSeconds = parseInt(card.getAttribute('data-created'));
-                const createdTime = createdSeconds * 1000; 
-                const now = new Date().getTime();
+                const createdSeconds = parseInt(card.getAttribute('data-created'), 10);
                 
-                // Find elapsed seconds
-                const diff = Math.floor((now - createdTime) / 1000);
-                
-                let timeLeft = 120 - diff;
-                if (timeLeft < 0) timeLeft = 0;
+                // NaN Guard: Default to 120s if timestamp attribute fails
+                if (isNaN(createdSeconds)) {
+                    startTimerForCard(card, 120, orderId);
+                    return;
+                }
 
-                // 3. Start the live countdown for this pre-loaded card
+                // Measure difference using server timestamp baseline
+                const diff = serverNow - createdSeconds;
+                let timeLeft = Math.max(0, 120 - diff);
+
                 startTimerForCard(card, timeLeft, orderId);
             });
         });
-        // --- END NEW BLOCK ---
 
-        // Audio Logic & Offline Guard ---
+
+        // --- AUDIO & POLLING LOGIC ---
         function playAlarm3Times() {
             const audio = document.getElementById('orderAlarm');
+            if (!audio) return;
+
             let playCount = 0;
-            
             audio.currentTime = 0; 
-            audio.play().catch(e => console.log('Audio blocked by browser:', e));
+            audio.play().catch(e => console.log('Audio playback blocked:', e));
 
             audio.onended = function() {
                 playCount++;
@@ -556,79 +559,120 @@
                     audio.currentTime = 0;
                     audio.play();
                 } else {
-                    audio.onended = null; // Clean up listner when done
+                    audio.onended = null;
                 }
             };
         }
 
+        // Add a Set to track notifications you've already displayed
+        let notifiedAcceptedRefs = new Set();
+
         function pollForOrders() {
-            // OFFLINE GUARD: If toggle is off, do not poll or play alarms
-            const isOnline = document.getElementById('availability-toggle').checked;
-            if (!isOnline) return; 
+            const toggleEl = document.getElementById('availability-toggle');
+            if (!toggleEl || !toggleEl.checked) return; 
 
             fetch('/courier/api/poll-orders/')
             .then(res => res.json())
             .then(data => {
                 const list = document.getElementById('order-list');
                 const emptyState = document.querySelector('.empty-state');
+                if (!list || !data.orders) return;
+
+                // --- HANDLE RECENTLY ACCEPTED NOTIFICATIONS ---
+                if (data.recently_accepted && data.recently_accepted.length > 0) {
+                    data.recently_accepted.forEach(item => {
+                        // Don't notify the courier who actually accepted it
+                        if (!notifiedAcceptedRefs.has(item.ref)) {
+                            notifiedAcceptedRefs.add(item.ref);
+
+                            // If the card is still on screen, remove it immediately
+                            const cardToRemove = document.getElementById(`order-${item.id}`);
+                            if (cardToRemove) {
+                                cardToRemove.remove();
+                                displayedOrderIds.delete(parseInt(item.id, 10));
+                            }
+
+                            showToast(`Order #${item.ref.toUpperCase()} was accepted by ${item.courier_name}`);
+                        }
+                    });
+                }
+
+                // --- RENDER AVAILABLE ORDERS ---
                 let hasNew = false;
-                
-                if(data.orders.length > 0 && emptyState) emptyState.style.display = 'none';
+                const serverOrderIds = new Set(data.orders.map(o => parseInt(o.id, 10)));
+
+                // Remove orders locally if no longer available on server
+                displayedOrderIds.forEach(localId => {
+                    if (!serverOrderIds.has(localId)) {
+                        const cardToRemove = document.getElementById(`order-${localId}`);
+                        if (cardToRemove) cardToRemove.remove();
+                        displayedOrderIds.delete(localId);
+                    }
+                });
+
+                if (data.orders.length > 0 && emptyState) {
+                    emptyState.style.display = 'none';
+                }
 
                 data.orders.forEach(order => {
-                    if(!displayedOrderIds.has(order.id)) {
-                        displayedOrderIds.add(order.id);
-                        hasNew = true;
-                        
-                        let timeLeft = order.time_left;
+                    const numericId = parseInt(order.id, 10);
 
-                        // If the server says it's already expired, don't even bother rendering it
-                        if(timeLeft <= 0) return;
+                    if (!displayedOrderIds.has(numericId)) {
+                        let timeLeft = parseInt(order.time_left, 10);
+                        if (isNaN(timeLeft) || timeLeft <= 0) return;
+
+                        displayedOrderIds.add(numericId);
+                        hasNew = true;
 
                         const card = document.createElement('div');
                         card.className = 'fin-card order-request';
-                        card.id = `order-${order.id}`;
+                        card.id = `order-${numericId}`;
                         card.innerHTML = `
                             <div class="card-left">
                                 <div class="icon-box"><i class='bx bx-package'></i></div>
                                 <div class="card-details">
                                     <span class="new-badge">New Order</span>
-                                    <p class="h-name">${order.address}</p>
-                                    <p class="o-ref">Ref: <span>#${order.ref.toUpperCase()}</span></p>
+                                    <p class="h-name">${order.address || 'N/A'}</p>
+                                    <p class="o-ref">Ref: <span>#${(order.ref || '').toUpperCase()}</span></p>
                                 </div>
                             </div>
                             <div class="action-wrap">
                                 <small class="expiry-timer">${timeLeft}s</small>
-                                <button class="accept-btn" onclick="acceptOrder('${order.id}', '${order.ref}')">Accept</button>
+                                <button class="accept-btn" onclick="acceptOrder('${numericId}', '${order.ref}')">Accept</button>
                             </div>
                         `;
                         list.prepend(card);
-                        startTimerForCard(card, timeLeft, order.id);
+                        startTimerForCard(card, timeLeft, numericId);
                     }
                 });
-                
-                if(hasNew) {
-                    playAlarm3Times();
-                    document.getElementById('order-count').innerText = displayedOrderIds.size;
+
+                const countDisplay = document.getElementById('order-count');
+                if (countDisplay) countDisplay.innerText = displayedOrderIds.size;
+
+                if (displayedOrderIds.size === 0 && emptyState) {
+                    emptyState.style.display = 'block';
                 }
-            });
+
+                if (hasNew) playAlarm3Times();
+            })
+            .catch(err => console.error('Polling error:', err));
         }
+
 
         function startTimerForCard(card, timeLeft, orderId) {
             const timerLabel = card.querySelector('.expiry-timer');
             const badge = card.querySelector('.new-badge');
             
             const countdown = setInterval(() => {
-                // MEMORY LEAK FIX: Clear interval if the card was removed by acceptOrder()
                 if (!document.body.contains(card)) {
                     clearInterval(countdown);
                     return;
                 }
 
                 timeLeft--;
-                timerLabel.innerText = timeLeft + 's';
+                if (timerLabel) timerLabel.innerText = `${timeLeft}s`;
                 
-                if(timeLeft < 105 && badge) badge.style.display = 'none';
+                if (timeLeft < 105 && badge) badge.style.display = 'none';
 
                 if (timeLeft <= 0) {
                     clearInterval(countdown);
@@ -636,57 +680,77 @@
                     setTimeout(() => {
                         card.remove();
                         displayedOrderIds.delete(orderId);
-                        document.getElementById('order-count').innerText = displayedOrderIds.size;
-                        if(displayedOrderIds.size === 0) document.querySelector('.empty-state').style.display = 'block';
+                        
+                        const countDisplay = document.getElementById('order-count');
+                        if (countDisplay) countDisplay.innerText = displayedOrderIds.size;
+                        
+                        const emptyState = document.querySelector('.empty-state');
+                        if (displayedOrderIds.size === 0 && emptyState) {
+                            emptyState.style.display = 'block';
+                        }
                     }, 500);
                 }
             }, 1000);
         }
 
-        setInterval(pollForOrders, 5000);
+        setInterval(pollForOrders, 2000);
 
+        // --- ACTIONS & UI TOGGLES ---
         function acceptOrder(orderId, orderRef) {
-            fetch(`/courier/api/accept-order/${orderId}/`, {
+            const numericId = parseInt(orderId, 10);
+
+            fetch(`/courier/api/accept-order/${numericId}/`, {
                 method: "POST",
-                headers: { "X-CSRFToken": csrftoken, "X-Requested-With": "XMLHttpRequest" }
+                headers: { 
+                    "X-CSRFToken": csrftoken, 
+                    "X-Requested-With": "XMLHttpRequest",
+                    "Content-Type": "application/json"
+                }
             })
             .then(res => res.json())
             .then(data => {
-                if(data.status === "success") {
+                if (data.status === "success") {
                     showToast("Order Accepted! Redirecting to tracker...");
                     setTimeout(() => {
                         window.location.href = `/courier/track/${orderRef}/`;
                     }, 1500);
                 } else {
                     showToast(data.message || "Order expired or taken by another courier");
-                    document.getElementById(`order-${orderId}`).remove();
-                    displayedOrderIds.delete(parseInt(orderId));
+                    const card = document.getElementById(`order-${numericId}`);
+                    if (card) card.remove();
+                    displayedOrderIds.delete(numericId);
+
+                    const countDisplay = document.getElementById('order-count');
+                    if (countDisplay) countDisplay.innerText = displayedOrderIds.size;
                 }
-            });
+            })
+            .catch(err => showToast("Network error. Please try again."));
         }
 
         function toggleHistory() {
-            document.getElementById('history-panel').classList.toggle('active');
+            document.getElementById('history-panel')?.classList.toggle('active');
         }
 
         function toggleProfile() {
-            document.getElementById('profile-panel').classList.toggle('active');
+            document.getElementById('profile-panel')?.classList.toggle('active');
         }
 
         function toggleStatus() {
-            const isOnline = document.getElementById('availability-toggle').checked;
+            const isOnline = document.getElementById('availability-toggle')?.checked;
             const statusPill = document.querySelector('.status-pill');
 
-            if (isOnline) {
-                statusPill.classList.remove('offline');
-                statusPill.classList.add('available');
-                statusPill.innerHTML = '● Active';
-                showToast("You are now online and scanning for orders.");
-            } else {
-                statusPill.classList.remove('available');
-                statusPill.classList.add('offline');
-                statusPill.innerHTML = '● Offline';
-                showToast("You are offline. Alarms paused.");
+            if (statusPill) {
+                if (isOnline) {
+                    statusPill.classList.remove('offline');
+                    statusPill.classList.add('available');
+                    statusPill.innerHTML = '● Active';
+                    showToast("You are now online and scanning for orders.");
+                } else {
+                    statusPill.classList.remove('available');
+                    statusPill.classList.add('offline');
+                    statusPill.innerHTML = '● Offline';
+                    showToast("You are offline. Alarms paused.");
+                }
             }
 
             fetch('/courier/api/toggle-status/', {
@@ -697,7 +761,7 @@
         }
 
         function filterHistory() {
-            const searchVal = document.getElementById('history-search').value.toLowerCase().trim();
+            const searchVal = document.getElementById('history-search')?.value.toLowerCase().trim() || "";
             const items = document.querySelectorAll('.history-item');
             const baseEmptyState = document.getElementById('history-base-empty');
             const searchEmptyState = document.getElementById('history-search-empty');
@@ -705,7 +769,6 @@
             let visibleCount = 0;
 
             items.forEach(item => {
-                // Convert the dataset attributes to lowercase for accurate matching
                 const customer = (item.getAttribute('data-customer') || "").toLowerCase();
                 const reference = (item.getAttribute('data-ref') || "").toLowerCase();
 
@@ -719,26 +782,27 @@
 
             if (visibleCount === 0 && searchVal !== "") {
                 if (baseEmptyState) baseEmptyState.style.display = 'none';
-                searchEmptyState.style.display = 'block';
+                if (searchEmptyState) searchEmptyState.style.display = 'block';
             } else if (visibleCount === 0 && searchVal === "") {
                 if (baseEmptyState) baseEmptyState.style.display = 'block';
-                searchEmptyState.style.display = 'none';
+                if (searchEmptyState) searchEmptyState.style.display = 'none';
             } else {
                 if (baseEmptyState) baseEmptyState.style.display = 'none';
-                searchEmptyState.style.display = 'none';
+                if (searchEmptyState) searchEmptyState.style.display = 'none';
             }
         }
 
-        /* --- Updated Profile AJAX Save Script (Fixed UI element references) --- */
         function saveProfile() {
-            const username = document.getElementById('username').value;
-            const email = document.getElementById('email').value;
-            const loc1 = document.getElementById('loc1').value;
-            const loc2 = document.getElementById('loc2').value;
+            const username = document.getElementById('username')?.value || '';
+            const email = document.getElementById('email')?.value || '';
+            const loc1 = document.getElementById('loc1')?.value || '';
+            const loc2 = document.getElementById('loc2')?.value || '';
             const btn = document.querySelector('.save-btn');
             
-            btn.innerHTML = "<i class='bx bx-loader-alt bx-spin'></i> Saving...";
-            btn.style.opacity = '0.7';
+            if (btn) {
+                btn.innerHTML = "<i class='bx bx-loader-alt bx-spin'></i> Saving...";
+                btn.style.opacity = '0.7';
+            }
 
             fetch("{% url 'update_profile_ajax' %}", {
                 method: "POST",
@@ -751,11 +815,14 @@
             })
             .then(response => response.json())
             .then(data => {
-                if(data.status === "success") {
-                    // Update layout dynamic components safely using corrected ID selectors
-                    document.getElementById('display-locs').innerText = `${data.loc1} & ${data.loc2 || 'None'}`;
-                    document.getElementById('nav-username').innerText = data.username;
-                    document.getElementById('nav-avatar').innerText = data.username.charAt(0).toUpperCase();
+                if (data.status === "success") {
+                    const locsEl = document.getElementById('display-locs');
+                    const navUserEl = document.getElementById('nav-username');
+                    const navAvEl = document.getElementById('nav-avatar');
+
+                    if (locsEl) locsEl.innerText = `${data.loc1} & ${data.loc2 || 'None'}`;
+                    if (navUserEl) navUserEl.innerText = data.username;
+                    if (navAvEl && data.username) navAvEl.innerText = data.username.charAt(0).toUpperCase();
                     
                     toggleProfile(); 
                     showToast("Profile updated successfully!");
@@ -768,23 +835,27 @@
                 showToast("An error occurred.");
             })
             .finally(() => {
-                btn.innerHTML = "Save Changes";
-                btn.style.opacity = '1';
+                if (btn) {
+                    btn.innerHTML = "Save Changes";
+                    btn.style.opacity = '1';
+                }
             });
         }
 
-        /* --- Delete Confirmation Modal Methods --- */
         function openDeleteModal() {
-            document.getElementById('delete-confirm-modal').classList.add('show');
+            document.getElementById('delete-confirm-modal')?.classList.add('show');
         }
 
         function closeDeleteModal() {
-            document.getElementById('delete-confirm-modal').classList.remove('show');
+            document.getElementById('delete-confirm-modal')?.classList.remove('show');
         }
 
         function showToast(msg) {
             const toast = document.getElementById("toast");
-            document.getElementById("toast-text").innerText = msg;
+            const toastText = document.getElementById("toast-text");
+            if (!toast || !toastText) return;
+
+            toastText.innerText = msg;
             toast.classList.add("show");
             setTimeout(() => { toast.classList.remove("show"); }, 3000);
         }

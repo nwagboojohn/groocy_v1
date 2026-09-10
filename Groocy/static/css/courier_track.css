@@ -41,6 +41,25 @@ body {
     gap: 8px;
 }
 
+/* Unit Type Badge Styling */
+.unit-badge {
+    padding: 4px 6px;
+    border-radius: 4px;
+    font-size: 0.85em;
+    font-weight: 600;
+    margin: 0 4px;
+    display: inline-block;
+}
+.unit-piece {
+    background-color: #e5e7eb; 
+    color: #4b5563; 
+}
+.unit-carton, 
+.unit-pack {
+    background-color: #6b21a8; 
+    color: #ffffff !important;
+}
+
 .customer-info h4 { margin: 0; font-size: 1rem; text-align: right; }
 .customer-info p { margin: 0; font-size: 0.8rem; color: var(--gray); text-align: right; }
 
