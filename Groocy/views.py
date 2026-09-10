@@ -27,64 +27,57 @@ def signup_view(request):
     if request.method == 'POST':
         form = StudentSignUpForm(request.POST)
         if form.is_valid():
-            # 1. Save but don't commit to DB yet
             user = form.save(commit=False)
-            # 2. Hash the password (CRITICAL STEP)
             user.set_password(form.cleaned_data['password'])
-            # 3. Save to DB
             user.save()
 
-            # --- FIX: Create the Profile object for this new user ---
             Profile.objects.create(user=user)
-            # ---------------------------------------------------------
 
             # Send Welcome Email
-            try:
+            if user.email:
                 send_groocy_email(
-                    user.email,
-                    "Welcome to the fast lane 🚀",
-                    "emails/welcome_user.html",
-                    {'username': user.username}
+                    recipient_email=user.email,
+                    subject="Welcome to the fast lane 🚀",
+                    template_name="emails/welcome_user.html",
+                    context={'username': user.username}
                 )
-            except Exception as e:
-                print(f"Email Error: {e}")
 
-            # 5. Redirect using the NAME from urls.py
             return redirect('login')
         else:
-            # If invalid, we re-render the page WITH the form (to show errors)
             return render(request, 'registration/signup.html', {'form': form})
     
-    # If GET request
     form = StudentSignUpForm()
     return render(request, 'registration/signup.html', {'form': form})
 
 
 def login_view(request):
     if request.method == 'POST':
-        # Match the 'name' attributes from your HTML exactly
         username = request.POST.get('username')
-        password = request.POST.get('password') # Ensure your HTML uses name="password"
+        password = request.POST.get('password')
 
-        # Check if user exists and password is correct
         user = authenticate(request, username=username, password=password)
 
         if user is not None:
-            # Check if this specific user has a registered Customer Profile
             has_customer_profile = Profile.objects.filter(user=user).exists()
 
             if has_customer_profile:
-                # All clear! Log them in and redirect
                 login(request, user)
+
+                # Send Login Notification Email
+                if user.email:
+                    send_groocy_email(
+                        recipient_email=user.email,
+                        subject="Login Alert: Groocy Account 🔐",
+                        template_name="emails/login_user.html",
+                        context={'username': user.username}
+                    )
+
                 return redirect('home') 
             else:
-                # Authenticated as a user, but NOT a customer (e.g., they are a courier)
                 messages.error(request, "This account is not a registered customer account.")
         else:
-            # Invalid credentials entirely
             messages.error(request, "Invalid email or password.")
 
-    # If it's a GET request, just show the page
     return render(request, 'registration/login.html')
 
 
@@ -97,28 +90,30 @@ def password_reset_request(request):
         if user:
             # Generate a random 6-digit number
             otp = str(random.randint(100000, 999999))
-            
+
             # Store OTP and Email in session for 5 minutes
             request.session['reset_otp'] = otp
             request.session['reset_email'] = email
             request.session['otp_created_at'] = timezone.now().timestamp()
-            
+
             # Send the OTP via your existing email function
-            try:
-                send_groocy_email(
-                    email,
-                    f"{otp} is your Groocy reset code",
-                    "emails/otp_email.html",
-                    {'otp': otp, 'username': user.username}
-                )
+            sent = send_groocy_email(
+                recipient_email=email,
+                subject=f"{otp} is your Groocy reset code",
+                template_name="emails/otp_email.html",
+                context={'otp': otp, 'username': user.username}
+            )
+            
+            if sent:
                 messages.success(request, "OTP sent to email! It expires in 5 minutes.")
                 return redirect('password_reset_otp_verify')
-            except Exception as e:
-                messages.error(request, "Error sending email. Try again.")
+            else:
+                messages.error(request, "Error sending email. Check SMTP setup.")
         else:
             messages.error(request, "No account found with that email.")
             
     return render(request, 'registration/password_reset.html')
+
 
 # Verify OTP and Update Password
 def password_reset_otp_verify(request):
@@ -167,17 +162,13 @@ def logout_view(request):
         user_email = request.user.email
         user_name = request.user.username
         
-        # Send Email FIRST before destroying the session
         if user_email:
-            try:
-                send_groocy_email(
-                    user_email,
-                    "See you soon 👋",
-                    "emails/logout_user.html",
-                    {'username': user_name}
-                )
-            except Exception as e:
-                print(f"Logout Email Error: {e}")
+            send_groocy_email(
+                recipient_email=user_email,
+                subject="See you soon 👋",
+                template_name="emails/logout_user.html",
+                context={'username': user_name}
+            )
 
         logout(request)
         messages.info(request, "You logged out successfully!")
@@ -1122,15 +1113,13 @@ def courier_signup(request):
             user = form.save()
             
             # Send Welcome Email
-            try:
+            if user.email:
                 send_groocy_email(
-                    "Ready to Earn? Welcome to the Team! 💰",
-                    "emails/welcome_courier.html",
-                    {'username': user.username},
-                    user.email
+                    recipient_email=user.email,
+                    subject="Ready to Earn? Welcome to the Team! 💰",
+                    template_name="emails/welcome_courier.html",
+                    context={'username': user.username}
                 )
-            except Exception as e:
-                print(f"Signup Email Error: {e}")
                 
             return redirect('courier_login')
     else:
@@ -1140,16 +1129,24 @@ def courier_signup(request):
 
 def courier_login(request):
     if request.method == 'POST':
-        user = authenticate(username=request.POST['username'], password=request.POST['password'])
+        user = authenticate(username=request.POST.get('username'), password=request.POST.get('password'))
         if user is not None:
-            # 1. Fixed the typo to match your model's related_name ('courier_profile')
             if hasattr(user, 'courier_profile'):
-                # 2. Safety check: Block soft-deleted couriers from accessing the dashboard
                 if user.courier_profile.is_deleted:
                     messages.error(request, "This account has been deleted.")
                     return render(request, 'courier/courier_login.html')
                 
                 login(request, user)
+                
+                # Send Courier Login Email
+                if user.email:
+                    send_groocy_email(
+                        recipient_email=user.email,
+                        subject="Rider Login Alert 🚴",
+                        template_name="emails/login_courier.html",
+                        context={'username': user.username}
+                    )
+                    
                 return redirect('courier_dashboard')
             else:
                 messages.error(request, "This account is not registered as a courier.")
@@ -1164,15 +1161,12 @@ def courier_logout(request):
         user_name = request.user.username
         
         if user_email:
-            try:
-                send_groocy_email(
-                    f"Rider Log Out Notice 🚴!",
-                    "emails/logout_courier.html",
-                    {'username': user_name},
-                    user_email
-                )
-            except Exception as e:
-                print(f"Logout Email Error: {e}")
+            send_groocy_email(
+                recipient_email=user_email,
+                subject="Rider Log Out Notice 🚴!",
+                template_name="emails/logout_courier.html",
+                context={'username': user_name}
+            )
 
         logout(request)
         messages.info(request, "Logged out successfully!")
